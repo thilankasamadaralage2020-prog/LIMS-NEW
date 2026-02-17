@@ -32,11 +32,16 @@ def create_pdf(bill):
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
     pdf.set_font("Arial", 'B', 11)
+    
+    # PDF එකට නව දත්ත එක් කිරීම
     pdf.text(10, pdf.get_y() + 5, f"Patient: {bill['patient']}")
+    pdf.text(10, pdf.get_y() + 12, f"Age: {bill['age_y']}Y {bill['age_m']}M")
+    pdf.text(10, pdf.get_y() + 19, f"Mobile: {bill['mobile']}")
     pdf.text(130, pdf.get_y() + 5, f"Date: {bill['date']}")
-    pdf.text(10, pdf.get_y() + 12, f"Doctor: {bill['doctor']}")
     pdf.text(130, pdf.get_y() + 12, f"Ref No: {bill['bill_id']}")
-    pdf.ln(20)
+    pdf.text(130, pdf.get_y() + 19, f"Doctor: {bill['doctor']}")
+    pdf.ln(25)
+    
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.cell(140, 10, "Test Description", border=0)
     pdf.cell(40, 10, "Price (LKR)", border=0, align='R')
@@ -79,7 +84,7 @@ else:
     if st.sidebar.button("⬅️ Back to Home"): st.rerun()
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"logged_in": False}))
 
-    # --- Admin Dashboard (Fixed) ---
+    # --- Admin Dashboard ---
     if st.session_state.role == "Admin":
         st.title("👨‍💼 Admin Dashboard")
         t1, t2, t3, t4, t5 = st.tabs(["Users", "Doctors", "Tests", "✅ Approvals", "🛠 Edit Bill"])
@@ -157,40 +162,69 @@ else:
                         eb['patient'] = en
                         st.success("Updated!")
 
-    # --- Billing Dashboard ---
+    # --- Billing Dashboard (Updated Form) ---
     elif st.session_state.role == "Billing":
         st.title("💳 Billing Dashboard")
         t_new, t_saved, t_recall, t_summary = st.tabs(["📝 New Bill", "📂 Saved Bills", "🔍 RECALL", "📊 Summary"])
 
         with t_new:
-            p_name = st.text_input("Patient Name")
+            st.subheader("New Patient Bill")
+            
+            # පෝරමයේ නව කොටස් (Salute, Name, Age, Mobile)
+            c1, c2 = st.columns([1, 3])
+            salute = c1.selectbox("Salute", ["Mr.", "Mrs.", "Miss", "Mast.", "Baby", "Rev."])
+            p_name = c2.text_input("Patient Name")
+            
+            a1, a2, a3 = st.columns([1, 1, 2])
+            age_y = a1.number_input("Age (Years)", min_value=0, max_value=120, step=1)
+            age_m = a2.number_input("Age (Months)", min_value=0, max_value=11, step=1)
+            p_mobile = a3.text_input("Mobile Number")
+            
             ref_doc = st.selectbox("Doctor", options=st.session_state.doctors)
             sel_tests = st.multiselect("Tests", options=[t['name'] for t in st.session_state.tests])
+            
             total = sum(t['price'] for t in st.session_state.tests if t['name'] in sel_tests)
-            disc = st.number_input("Discount", min_value=0.0)
+            disc = st.number_input("Discount (LKR)", min_value=0.0)
             final = total - disc
+            
             st.write(f"### Final Amount: LKR {final:,.2f}")
+            
             if st.button("Save & Generate Bill"):
                 if p_name and sel_tests:
                     bid = f"LC{datetime.now().strftime('%y%m%d%H%M%S')}"
-                    st.session_state.saved_bills.append({"bill_id": bid, "date": date.today().isoformat(), "patient": p_name, "doctor": ref_doc, "tests": sel_tests, "final": final, "user": st.session_state.current_user})
-                    st.success("Saved!")
+                    full_name = f"{salute} {p_name}"
+                    st.session_state.saved_bills.append({
+                        "bill_id": bid, "date": date.today().isoformat(), 
+                        "patient": full_name, "age_y": age_y, "age_m": age_m,
+                        "mobile": p_mobile, "doctor": ref_doc, 
+                        "tests": sel_tests, "final": final, 
+                        "user": st.session_state.current_user
+                    })
+                    st.success(f"Bill {bid} Saved Successfully!")
                     st.rerun()
+                else:
+                    st.warning("Please enter Patient Name and select at least one Test.")
 
         with t_saved:
+            st.subheader("Recently Saved Bills")
             my_bills = [b for b in st.session_state.saved_bills if b['user'] == st.session_state.current_user]
-            for b in reversed(my_bills[-10:]):
-                c1, c2 = st.columns([4, 1])
-                c1.write(f"**{b['bill_id']}** - {b['patient']}")
-                c2.download_button("PDF", create_pdf(b), file_name=f"{b['bill_id']}.pdf", key=f"dl_{b['bill_id']}")
+            if my_bills:
+                for b in reversed(my_bills[-10:]):
+                    c1, c2 = st.columns([4, 1])
+                    c1.write(f"**{b['bill_id']}** - {b['patient']} (LKR {b['final']:,.2f})")
+                    c2.download_button("PDF", create_pdf(b), file_name=f"{b['bill_id']}.pdf", key=f"dl_{b['bill_id']}")
+            else: st.info("No bills saved yet.")
 
         with t_recall:
+            st.subheader("Search Bills")
             sn = st.text_input("Search Name")
             if sn:
-                for r in [b for b in st.session_state.saved_bills if sn.lower() in b['patient'].lower()]:
-                    st.write(f"{r['bill_id']} - {r['patient']}")
+                results = [b for b in st.session_state.saved_bills if sn.lower() in b['patient'].lower()]
+                for r in results:
+                    st.write(f"{r['bill_id']} - {r['patient']} (Mobile: {r.get('mobile', 'N/A')})")
 
         with t_summary:
+            st.subheader(f"Sale Summary: {st.session_state.current_user}")
             u_bills = [b for b in st.session_state.saved_bills if b['user'] == st.session_state.current_user]
             if u_bills:
                 st.table(pd.DataFrame(u_bills)[["patient", "bill_id", "final"]])
