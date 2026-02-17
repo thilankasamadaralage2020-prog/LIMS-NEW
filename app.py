@@ -2,102 +2,151 @@ import streamlit as st
 from PIL import Image
 import os
 
-# 1. පිටුවේ මූලික සැකසුම් (Page Configuration)
-st.set_page_config(
-    page_title="Life Care LIMS", 
-    page_icon="🔬",
-    layout="centered"
-)
+# 1. පිටුවේ මූලික සැකසුම්
+st.set_page_config(page_title="Life Care LIMS", page_icon="🔬", layout="wide")
 
-# 2. පිවිසුම් පිටුව (Login Page Function)
+# දත්ත ගබඩා කිරීම සඳහා මූලික සැකසුම් (Initial Database Simulation)
+if 'users' not in st.session_state:
+    st.session_state.users = [{"username": "admin", "password": "123", "role": "Admin"}]
+if 'doctors' not in st.session_state:
+    st.session_state.doctors = []
+if 'tests' not in st.session_state:
+    st.session_state.tests = []
+if 'cancel_requests' not in st.session_state:
+    st.session_state.cancel_requests = []
+if 'billing_summary' not in st.session_state:
+    st.session_state.billing_summary = 5000.00  # උදාහරණයක් ලෙස පවතින මුදල
+
+# --- Functions ---
+
 def login():
-    # රසායනාගාර ලෝගෝ එක ඇතුළත් කිරීම
-    # 'logo.png' නමින් පින්තූරය ඔබේ ෆෝල්ඩරයේ තිබිය යුතුය
     if os.path.exists("logo.png"):
-        logo = Image.open("logo.png")
-        st.image(logo, width=200)
-    else:
-        st.info("💡 රසායනාගාර ලෝගෝ එක ඇතුළත් කිරීමට 'logo.png' ගොනුව ෆෝල්ඩරයට එක් කරන්න.")
-
-    st.title("🔬 Life Care LIMS")
-    st.subheader("Laboratory Information Management System")
+        st.image("logo.png", width=150)
+    st.title("🔬 Life Care LIMS Login")
     
-    # Login Form එක සෑදීම
     with st.form("login_form"):
-        st.markdown("### User Login")
-        username = st.text_input("User Name")
-        password = st.text_input("Password", type="password")
-        role = st.selectbox("Select Role", ["Admin", "Billing", "Technician", "Satellite"])
-        
-        submit = st.form_submit_button("Login")
+        u_name = st.text_input("User Name")
+        u_pass = st.text_input("Password", type="password")
+        u_role = st.selectbox("Select Role", ["Admin", "Billing", "Technician", "Satellite"])
+        submitted = st.form_submit_button("Login")
 
-        if submit:
-            # සරල මුරපද පරීක්ෂාව (මුරපදය '123' ලෙස සකසා ඇත)
-            if username != "" and password == "123":
-                st.session_state['logged_in'] = True
-                st.session_state['role'] = role
-                st.session_state['username'] = username
-                st.success(f"Welcome {username}! Loading {role} Dashboard...")
+        if submitted:
+            # User පරීක්ෂාව
+            user_found = next((u for u in st.session_state.users if u['username'] == u_name and u['password'] == u_pass and u['role'] == u_role), None)
+            
+            if user_found:
+                st.session_state.logged_in = True
+                st.session_state.current_user = u_name
+                st.session_state.role = u_role
                 st.rerun()
             else:
-                st.error("පරිශීලක නාමය හෝ මුරපදය වැරදියි! (Password: 123)")
+                st.error("Invalid Username, Password or Role!")
 
-# 3. ප්‍රධාන පාලක පුවරුව (Main Dashboard Function)
-def main_dashboard():
-    role = st.session_state['role']
-    username = st.session_state['username']
+def admin_dashboard():
+    st.title("👨‍💼 Admin Dashboard")
+    st.sidebar.write(f"Logged in as: **{st.session_state.current_user}**")
     
-    # Sidebar එක සැකසීම
-    st.sidebar.title("Navigation")
-    if os.path.exists("logo.png"):
-        st.sidebar.image("logo.png", width=100)
-    
-    st.sidebar.write(f"Logged in as: **{username}**")
-    st.sidebar.write(f"Role: **{role}**")
-    
-    if st.sidebar.button("Log Out"):
-        st.session_state['logged_in'] = False
+    if st.sidebar.button("Logout"):
+        st.session_state.logged_in = False
         st.rerun()
 
-    # එක් එක් Role එකට අදාළ දර්ශනය
-    st.header(f"🚀 {role} Portal")
-    st.divider()
+    tab1, tab2, tab3, tab4 = st.tabs(["👥 User Management", "🩺 Doctors", "🧪 Tests & Pricing", "✅ Approvals"])
 
-    if role == "Admin":
-        st.subheader("පද්ධති පරිපාලනය")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.button("Manage Users")
-            st.button("View System Reports")
-        with col2:
-            st.button("Database Backup")
-            st.button("Configuration Settings")
+    # 1. Create & Delete User
+    with tab1:
+        st.subheader("Add New User")
+        with st.form("add_user_form"):
+            new_u = st.text_input("New Username")
+            new_p = st.text_input("New Password")
+            new_r = st.selectbox("Role", ["Admin", "Billing", "Technician", "Satellite"])
+            if st.form_submit_button("Add User"):
+                if new_u:
+                    st.session_state.users.append({"username": new_u, "password": new_p, "role": new_r})
+                    st.success(f"User {new_u} added!")
+                    st.rerun()
 
-    elif role == "Billing":
-        st.subheader("බිල්පත් කළමනාකරණය")
-        patient_name = st.text_input("Patient Name")
-        test_type = st.multiselect("Select Tests", ["FBS", "Lipid Profile", "Full Blood Count", "Urine Full Report"])
-        if st.button("Generate Invoice"):
-            st.success(f"Invoice generated for {patient_name}")
+        st.divider()
+        st.subheader("Existing Users")
+        for i, u in enumerate(st.session_state.users):
+            col1, col2 = st.columns([3, 1])
+            col1.write(f"**{u['username']}** ({u['role']})")
+            if col2.button("Delete", key=f"del_user_{i}"):
+                st.session_state.users.pop(i)
+                st.rerun()
 
-    elif role == "Technician":
-        st.subheader("පරීක්ෂණ වාර්තා ඇතුළත් කිරීම")
-        lab_id = st.text_input("Enter Lab ID")
-        uploaded_file = st.file_uploader("Upload Machine Result (CSV/PDF)")
-        if st.button("Submit Results"):
-            st.info("Result submitted for verification.")
+    # 2. Add & Delete Doctor
+    with tab2:
+        st.subheader("Register Doctor")
+        with st.form("add_doc_form"):
+            d_name = st.text_input("Doctor Name")
+            if st.form_submit_button("Add Doctor"):
+                if d_name:
+                    st.session_state.doctors.append(d_name)
+                    st.rerun()
+        
+        st.divider()
+        for i, d in enumerate(st.session_state.doctors):
+            col1, col2 = st.columns([3, 1])
+            col1.write(d)
+            if col2.button("Delete", key=f"del_doc_{i}"):
+                st.session_state.doctors.pop(i)
+                st.rerun()
 
-    elif role == "Satellite":
-        st.subheader("සාම්පල ලියාපදිංචිය (Satellite Center)")
-        st.text_input("Center Name")
-        st.date_input("Collection Date")
-        st.button("Register Sample Transfer")
+    # 3. Add Tests with Price (LKR)
+    with tab3:
+        st.subheader("Add New Test")
+        with st.form("add_test_form"):
+            t_name = st.text_input("Test Name")
+            t_price = st.number_input("Price (LKR)", min_value=0.0, step=100.0)
+            if st.form_submit_button("Add Test"):
+                if t_name:
+                    st.session_state.tests.append({"name": t_name, "price": t_price})
+                    st.rerun()
+        
+        st.divider()
+        for i, t in enumerate(st.session_state.tests):
+            col1, col2, col3 = st.columns([2, 2, 1])
+            col1.write(t['name'])
+            col2.write(f"LKR {t['price']:.2f}")
+            if col3.button("Delete", key=f"del_test_{i}"):
+                st.session_state.tests.pop(i)
+                st.rerun()
 
-# 4. පද්ධතිය ක්‍රියාත්මක කිරීම (Execution)
+    # 4. Approve Bill Cancellations
+    with tab4:
+        st.subheader("Bill Cancellation Requests")
+        st.info(f"Current Billing Total: **LKR {st.session_state.billing_summary:.2f}**")
+        
+        if not st.session_state.cancel_requests:
+            st.write("No pending requests.")
+        else:
+            for i, req in enumerate(st.session_state.cancel_requests):
+                col1, col2, col3 = st.columns([2, 1, 1])
+                col1.write(f"Bill ID: {req['bill_id']} | Amount: LKR {req['amount']}")
+                if col2.button("Approve", key=f"app_{i}"):
+                    st.session_state.billing_summary -= req['amount']
+                    st.session_state.cancel_requests.pop(i)
+                    st.success("Bill Cancelled & Summary Updated!")
+                    st.rerun()
+                if col3.button("Reject", key=f"rej_{i}"):
+                    st.session_state.cancel_requests.pop(i)
+                    st.rerun()
+
+# --- Main App Logic ---
 if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
+    st.session_state.logged_in = False
 
-if not st.session_state['logged_in']:
+if not st.session_state.logged_in:
     login()
 else:
-    main_dashboard()
+    if st.session_state.role == "Admin":
+        admin_dashboard()
+    else:
+        st.title(f"{st.session_state.role} Dashboard")
+        st.write("Welcome! Work in progress...")
+        if st.button("Add Test Cancel Request (Demo)"):
+            st.session_state.cancel_requests.append({"bill_id": "B001", "amount": 1500.00})
+            st.success("Request sent to Admin!")
+        if st.sidebar.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
