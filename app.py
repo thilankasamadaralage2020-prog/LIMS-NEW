@@ -93,56 +93,89 @@ def admin_dashboard():
     t1, t2, t3, t4, t5 = st.tabs(["Users", "Doctors", "Tests", "✅ Approvals", "🛠 Edit Bill"])
     
     with t1:
-        with st.form("add_u"):
-            nu, np, nr = st.text_input("Username"), st.text_input("Password", type="password"), st.selectbox("Role", ["Admin", "Billing", "Technician", "Satellite"])
-            if st.form_submit_button("Add User"): 
+        st.subheader("Add New User")
+        # Forms භාවිත නොකර සෘජු Widgets භාවිතය
+        nu = st.text_input("New Username", key="admin_nu")
+        np = st.text_input("New Password", type="password", key="admin_np")
+        nr = st.selectbox("Role", ["Admin", "Billing", "Technician", "Satellite"], key="admin_nr")
+        if st.button("Create User"):
+            if nu and np:
                 st.session_state.users.append({"username": nu, "password": np, "role": nr})
-                st.success(f"User {nu} added!")
+                st.success(f"User {nu} added successfully!")
                 st.rerun()
+        st.divider()
+        st.write("### Existing Users")
         for i, u in enumerate(st.session_state.users):
-            c1, c2 = st.columns([3, 1])
+            c1, c2 = st.columns([4, 1])
             c1.write(f"**{u['username']}** ({u['role']})")
-            if c2.button("Delete User", key=f"du_{i}"): st.session_state.users.pop(i); st.rerun()
+            if c2.button("Delete", key=f"del_u_{i}"):
+                st.session_state.users.pop(i)
+                st.rerun()
 
     with t2:
-        with st.form("add_d"):
-            nd = st.text_input("Doctor Name")
-            if st.form_submit_button("Add Doctor"): 
-                st.session_state.doctors.append(nd)
-                st.success("Doctor added!"); st.rerun()
+        st.subheader("Add New Doctor")
+        nd_name = st.text_input("Doctor Name", key="admin_nd")
+        if st.button("Add Doctor"):
+            if nd_name:
+                st.session_state.doctors.append(nd_name)
+                st.success(f"Doctor {nd_name} added!")
+                st.rerun()
+        st.divider()
+        st.write("### Existing Doctors")
+        for i, d in enumerate(st.session_state.doctors):
+            c1, c2 = st.columns([4, 1])
+            c1.write(d)
+            if c2.button("Delete", key=f"del_d_{i}"):
+                st.session_state.doctors.pop(i)
+                st.rerun()
 
     with t3:
-        with st.form("add_t"):
-            nt, npr = st.text_input("Test Name"), st.number_input("Price")
-            if st.form_submit_button("Add Test"): 
-                st.session_state.tests.append({"name": nt, "price": npr})
-                st.success("Test added!"); st.rerun()
+        st.subheader("Add New Test")
+        nt_name = st.text_input("Test Name", key="admin_nt")
+        nt_price = st.number_input("Price (LKR)", min_value=0.0, step=10.0, key="admin_ntp")
+        if st.button("Add Test"):
+            if nt_name:
+                st.session_state.tests.append({"name": nt_name, "price": nt_price})
+                st.success(f"Test {nt_name} added!")
+                st.rerun()
+        st.divider()
+        st.write("### Test List")
+        for i, t in enumerate(st.session_state.tests):
+            c1, c2, c3 = st.columns([3, 2, 1])
+            c1.write(t['name'])
+            c2.write(f"LKR {t['price']:,.2f}")
+            if c3.button("Delete", key=f"del_t_{i}"):
+                st.session_state.tests.pop(i)
+                st.rerun()
 
     with t4:
-        st.subheader("Pending Cancellation Requests")
+        st.subheader("Cancellation Requests")
+        if not st.session_state.cancel_requests:
+            st.info("No pending requests.")
         for i, req in enumerate(st.session_state.cancel_requests):
-            col1, col2 = st.columns([3, 1])
-            col1.write(f"**Bill ID:** {req['bill_id']} | **User:** {req['user']}")
-            if col2.button("Approve Cancel", key=f"ap_{i}"):
+            c1, c2 = st.columns([4, 1])
+            c1.write(f"Bill ID: **{req['bill_id']}** (Requested by: {req['user']})")
+            if c2.button("Approve", key=f"app_can_{i}"):
                 st.session_state.saved_bills = [b for b in st.session_state.saved_bills if b['bill_id'] != req['bill_id']]
                 st.session_state.cancel_requests.pop(i)
-                st.success("Cancelled!"); st.rerun()
+                st.success("Bill Cancelled!")
+                st.rerun()
 
     with t5:
-        st.subheader("Edit Bill")
-        search_id = st.text_input("Enter Bill Ref Number")
-        if search_id:
-            bill_to_edit = next((b for b in st.session_state.saved_bills if b['bill_id'] == search_id), None)
-            if bill_to_edit:
-                with st.form("edit_f"):
-                    en = st.text_input("Patient Name", value=bill_to_edit['patient'])
-                    ey = st.number_input("Age Y", value=bill_to_edit['age_y'])
-                    em = st.number_input("Age M", value=bill_to_edit['age_m'])
-                    if st.form_submit_button("Update"):
-                        bill_to_edit['patient'] = en
-                        bill_to_edit['age_y'] = ey
-                        bill_to_edit['age_m'] = em
-                        st.success("Updated!"); st.rerun()
+        st.subheader("Edit Bill Details")
+        eb_id = st.text_input("Enter Bill Reference Number (e.g., LC...)")
+        if eb_id:
+            eb_target = next((b for b in st.session_state.saved_bills if b['bill_id'] == eb_id), None)
+            if eb_target:
+                with st.form("edit_bill_f"):
+                    new_name = st.text_input("Patient Name", value=eb_target['patient'])
+                    new_doc = st.selectbox("Doctor", options=st.session_state.doctors, index=st.session_state.doctors.index(eb_target['doctor']) if eb_target['doctor'] in st.session_state.doctors else 0)
+                    if st.form_submit_button("Save Changes"):
+                        eb_target['patient'] = new_name
+                        eb_target['doctor'] = new_doc
+                        st.success("Bill Updated!")
+                        st.rerun()
+            else: st.error("Bill not found.")
 
 # --- Billing Dashboard ---
 def billing_dashboard():
@@ -160,55 +193,63 @@ def billing_dashboard():
         p_mobile = st.text_input("Mobile Number")
         ref_doc = st.selectbox("Referral Doctor", options=st.session_state.doctors)
         selected_tests = st.multiselect("Select Tests", options=[t['name'] for t in st.session_state.tests])
+        
         total = sum(t['price'] for t in st.session_state.tests if t['name'] in selected_tests)
         discount = st.number_input("Discount (LKR)", min_value=0.0)
         final = total - discount
-        if st.button("Save & Generate"):
-            bid = f"LC{datetime.now().strftime('%y%m%d%H%M%S')}"
-            st.session_state.saved_bills.append({
-                "bill_id": bid, "date": date.today().isoformat(), "patient": f"{salute} {p_name}",
-                "age_y": p_age_y, "age_m": p_age_m, "mobile": p_mobile, "doctor": ref_doc,
-                "tests": selected_tests, "total": total, "discount": discount, "final": final,
-                "user": st.session_state.current_user
-            })
-            st.success("Bill Saved!"); st.rerun()
+        
+        st.write(f"### Total: LKR {total:,.2f}")
+        st.write(f"## Final Amount: LKR {final:,.2f}")
+        
+        if st.button("Save & Generate Bill"):
+            if p_name and selected_tests:
+                bid = f"LC{datetime.now().strftime('%y%m%d%H%M%S')}"
+                st.session_state.saved_bills.append({
+                    "bill_id": bid, "date": date.today().isoformat(), "patient": f"{salute} {p_name}",
+                    "age_y": p_age_y, "age_m": p_age_m, "mobile": p_mobile, "doctor": ref_doc,
+                    "tests": selected_tests, "total": total, "discount": discount, "final": final,
+                    "user": st.session_state.current_user
+                })
+                st.success(f"Bill {bid} Saved!"); st.rerun()
+            else: st.error("Name and Tests are required.")
 
     with t_recall:
-        st.subheader("Recall Bills")
+        st.subheader("Search & Recall Bills")
         s_mode = st.radio("Search By:", ["Name", "Mobile", "Date Range"], horizontal=True)
         results = []
         if s_mode == "Name":
-            sn = st.text_input("Patient Name")
+            sn = st.text_input("Enter Name")
             if sn: results = [b for b in st.session_state.saved_bills if sn.lower() in b['patient'].lower()]
         elif s_mode == "Mobile":
-            sm = st.text_input("Mobile No")
+            sm = st.text_input("Enter Mobile")
             if sm: results = [b for b in st.session_state.saved_bills if sm in b['mobile']]
         else:
             d1, d2 = st.columns(2)
-            dfrom = d1.date_input("From")
-            dto = d2.date_input("To")
-            results = [b for b in st.session_state.saved_bills if dfrom.isoformat() <= b['date'] <= dto.isoformat()]
+            df = d1.date_input("From")
+            dt = d2.date_input("To")
+            results = [b for b in st.session_state.saved_bills if df.isoformat() <= b['date'] <= dt.isoformat()]
         
         for r in results:
             with st.expander(f"{r['bill_id']} - {r['patient']}"):
+                st.write(f"Date: {r['date']} | Total: LKR {r['final']:,.2f}")
                 pdf_data = create_pdf(r)
-                st.download_button("Download PDF", pdf_data, file_name=f"{r['bill_id']}.pdf", key=f"r_{r['bill_id']}")
+                st.download_button("Download PDF", pdf_data, file_name=f"{r['bill_id']}.pdf", key=f"dl_{r['bill_id']}")
 
     with t_summary:
-        st.subheader(f"Summary for {st.session_state.current_user}")
+        st.subheader(f"Sale Summary for {st.session_state.current_user}")
         u_bills = [b for b in st.session_state.saved_bills if b['user'] == st.session_state.current_user]
         if u_bills:
-            df = pd.DataFrame(u_bills)[["patient", "bill_id", "final"]]
-            st.table(df)
-            st.write(f"### Total Sale: LKR {sum(b['final'] for b in u_bills):,.2f}")
+            df_sum = pd.DataFrame(u_bills)[["patient", "bill_id", "final"]]
+            st.table(df_sum)
+            st.write(f"## Total Sale: LKR {sum(b['final'] for b in u_bills):,.2f}")
             st.divider()
             for b in u_bills:
-                col_b1, col_b2 = st.columns([3, 1])
-                col_b1.write(f"{b['bill_id']} - {r['patient']}")
-                if col_b2.button("Send Cancel", key=f"can_req_{b['bill_id']}"):
+                c1, c2 = st.columns([4, 1])
+                c1.write(f"{b['bill_id']} - {b['patient']}")
+                if c2.button("Send Cancel", key=f"sum_can_{b['bill_id']}"):
                     st.session_state.cancel_requests.append({"bill_id": b['bill_id'], "user": st.session_state.current_user})
-                    st.info("Request Sent!")
-        else: st.info("No bills found.")
+                    st.info("Cancel request sent to Admin.")
+        else: st.info("No bills found for your account.")
 
 # --- Main Logic ---
 if not st.session_state.get('logged_in'): login()
