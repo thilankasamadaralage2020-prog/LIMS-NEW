@@ -3,10 +3,10 @@ import os
 from datetime import datetime, date
 from fpdf import FPDF
 
-# 1. Page Configuration
+# 1. පිටුවේ මූලික සැකසුම්
 st.set_page_config(page_title="Life Care LIMS", page_icon="🔬", layout="wide")
 
-# Session State Initialize
+# දත්ත මතකය පවත්වා ගැනීම (Session State)
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'saved_bills' not in st.session_state: st.session_state.saved_bills = []
 if 'tests' not in st.session_state: st.session_state.tests = []
@@ -15,7 +15,7 @@ if 'cancel_requests' not in st.session_state: st.session_state.cancel_requests =
 if 'users' not in st.session_state: 
     st.session_state.users = [{"username": "admin", "password": "123", "role": "Admin"}]
 
-# --- PDF Generator (නිවැරදි කරන ලද Format එක) ---
+# --- PDF සාදන ආකාරය (නිවැරදි කරන ලද Format එක) ---
 def create_pdf(bill):
     pdf = FPDF()
     pdf.add_page()
@@ -29,15 +29,15 @@ def create_pdf(bill):
     pdf.ln(10)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
-    pdf.set_font("Arial", 'B', 11)
     
+    pdf.set_font("Arial", 'B', 11)
     pdf.text(10, pdf.get_y() + 5, f"Patient: {bill['patient']}")
     pdf.text(10, pdf.get_y() + 12, f"Age: {bill.get('age_y', 0)}Y {bill.get('age_m', 0)}M")
     pdf.text(130, pdf.get_y() + 5, f"Date: {bill['date']}")
     pdf.text(130, pdf.get_y() + 12, f"Ref No: {bill['bill_id']}")
     pdf.ln(25)
     
-    # Test පේළිය ආරම්භය
+    # Test සහ Price එකම පේළියට
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(2)
     pdf.set_font("Arial", 'B', 10)
@@ -49,7 +49,6 @@ def create_pdf(bill):
     pdf.set_font("Arial", size=10)
     total_val = 0
     for t_name in bill['tests']:
-        # මෙහි මිල ගණන් පෙන්වීමට Test list එක පරීක්ෂා කරයි
         price = next((t['price'] for t in st.session_state.tests if t['name'] == t_name), 0)
         total_val += price
         pdf.cell(140, 8, str(t_name), ln=0)
@@ -73,7 +72,7 @@ def create_pdf(bill):
     
     return pdf.output(dest='S').encode('latin-1')
 
-# --- Login Logic ---
+# --- Login Screen ---
 if not st.session_state.logged_in:
     if os.path.exists("logo.png"):
         col1, col2, col3 = st.columns([1, 1, 1])
@@ -89,13 +88,15 @@ if not st.session_state.logged_in:
             st.session_state.current_user = u
             st.session_state.role = r
             st.rerun()
-        else: st.error("Invalid Username or Password")
+        else: st.error("වැරදි පරිශීලක නාමයක් හෝ මුරපදයක්")
+
+# --- Dashboard Logic ---
 else:
     # Sidebar
     if os.path.exists("logo.png"):
         st.sidebar.image("logo.png", use_container_width=True)
     
-    # --- Back Button (නිවැරදි කරන ලදී) ---
+    # Back to Home බොත්තම
     if st.sidebar.button("⬅️ Back to Home"):
         st.rerun()
         
@@ -103,8 +104,63 @@ else:
         st.session_state.logged_in = False
         st.rerun()
 
+    # --- Admin Dashboard (නැවත ඇතුළත් කරන ලදී) ---
+    if st.session_state.role == "Admin":
+        st.title("👨‍💼 Admin Dashboard")
+        t1, t2, t3, t4, t5 = st.tabs(["Users", "Doctors", "Tests", "✅ Approvals", "🛠 Edit Bill"])
+        
+        with t1:
+            st.subheader("Manage Users")
+            nu = st.text_input("New Username")
+            np = st.text_input("New Password", type="password")
+            nr = st.selectbox("Role", ["Admin", "Billing", "Technician"], key="admin_role")
+            if st.button("Create User"):
+                if nu and np:
+                    st.session_state.users.append({"username": nu, "password": np, "role": nr})
+                    st.success("User added!"); st.rerun()
+            st.divider()
+            for i, user in enumerate(st.session_state.users):
+                c1, c2 = st.columns([4,1])
+                c1.write(f"**{user['username']}** ({user['role']})")
+                if c2.button("Delete", key=f"u_{i}"):
+                    st.session_state.users.pop(i); st.rerun()
+
+        with t2:
+            st.subheader("Manage Doctors")
+            nd = st.text_input("Doctor Name")
+            if st.button("Add Doctor"):
+                if nd: st.session_state.doctors.append(nd); st.success("Added!"); st.rerun()
+            st.divider()
+            for i, d in enumerate(st.session_state.doctors):
+                c1, c2 = st.columns([4,1])
+                c1.write(d)
+                if c2.button("Delete", key=f"d_{i}"):
+                    st.session_state.doctors.pop(i); st.rerun()
+
+        with t3:
+            st.subheader("Manage Tests")
+            nt = st.text_input("Test Name")
+            npr = st.number_input("Price (LKR)", min_value=0.0)
+            if st.button("Add Test"):
+                if nt: st.session_state.tests.append({"name": nt, "price": npr}); st.success("Added!"); st.rerun()
+            st.divider()
+            for i, t in enumerate(st.session_state.tests):
+                c1, c2 = st.columns([4,1])
+                c1.write(f"{t['name']} - LKR {t['price']}")
+                if c2.button("Delete", key=f"t_{i}"):
+                    st.session_state.tests.pop(i); st.rerun()
+
+        with t4:
+            st.subheader("Cancellation Approvals")
+            for i, req in enumerate(st.session_state.cancel_requests):
+                st.warning(f"Bill ID: {req['bill_id']} (Requested by: {req['user']})")
+                if st.button("Approve Cancel", key=f"app_{i}"):
+                    st.session_state.saved_bills = [b for b in st.session_state.saved_bills if b['bill_id'] != req['bill_id']]
+                    st.session_state.cancel_requests.pop(i)
+                    st.rerun()
+
     # --- Billing Dashboard ---
-    if st.session_state.role == "Billing":
+    elif st.session_state.role == "Billing":
         st.title("💳 Billing Dashboard")
         t_new, t_saved, t_recall, t_summary = st.tabs(["📝 New Bill", "📂 Saved Bills", "🔍 RECALL", "📊 Summary"])
 
@@ -121,6 +177,7 @@ else:
             total = sum(t['price'] for t in st.session_state.tests if t['name'] in sel_tests)
             disc = st.number_input("Discount (LKR)", min_value=0.0)
             final = total - disc
+            st.write(f"### Final Amount: LKR {final:,.2f}")
             if st.button("Save & Generate Bill"):
                 if p_name and sel_tests:
                     bid = f"LC{datetime.now().strftime('%y%m%d%H%M%S')}"
@@ -133,22 +190,41 @@ else:
 
         with t_saved:
             st.subheader("Your Saved Bills")
-            # --- Saved Bills දර්ශනය වීම නිවැරදි කරන ලදී ---
+            # වර්තමාන User ට අදාළ බිල්පත් පෙන්වීම
             my_bills = [b for b in st.session_state.saved_bills if b['user'] == st.session_state.current_user]
             if not my_bills:
-                st.info("No saved bills found.")
+                st.info("තවමත් බිල්පත් කිසිවක් සුරැකී නැත.")
             else:
                 for b in reversed(my_bills):
-                    c1, c2 = st.columns([4, 1])
-                    c1.write(f"**{b['bill_id']}** | {b['patient']} | {b['date']}")
-                    c2.download_button("PDF", create_pdf(b), file_name=f"{b['bill_id']}.pdf", key=f"dl_{b['bill_id']}")
+                    col_b1, col_b2 = st.columns([4, 1])
+                    col_b1.write(f"**{b['bill_id']}** | {b['patient']} | {b['date']}")
+                    col_b2.download_button("PDF", create_pdf(b), file_name=f"{b['bill_id']}.pdf", key=f"dl_{b['bill_id']}")
 
         with t_recall:
-            # පවතින සෙවුම් පහසුකම් මෙහි තිබේ...
-            pass
+            st.subheader("Search All Bills")
+            mode = st.radio("Search By:", ["Name", "Mobile", "Date Range"], horizontal=True)
+            res = []
+            if mode == "Name":
+                sn = st.text_input("Enter Patient Name")
+                if sn: res = [b for b in st.session_state.saved_bills if sn.lower() in b['patient'].lower()]
+            elif mode == "Mobile":
+                sm = st.text_input("Enter Mobile Number")
+                if sm: res = [b for b in st.session_state.saved_bills if sm in b.get('mobile', '')]
+            else:
+                c1, c2 = st.columns(2); sd = c1.date_input("From"); ed = c2.date_input("To")
+                res = [b for b in st.session_state.saved_bills if sd.isoformat() <= b['date'] <= ed.isoformat()]
+            for r in res:
+                st.write(f"{r['bill_id']} - {r['patient']}")
+                st.download_button("Download", create_pdf(r), file_name=f"{r['bill_id']}.pdf", key=f"rec_{r['bill_id']}")
 
-    # --- Admin Dashboard ---
-    elif st.session_state.role == "Admin":
-        st.title("👨‍💼 Admin Dashboard")
-        # Admin tabs logic here...
-        pass
+        with t_summary:
+            st.subheader("Summary & Cancellation")
+            u_bills = [b for b in st.session_state.saved_bills if b['user'] == st.session_state.current_user]
+            for b in u_bills:
+                c1, c2 = st.columns([4, 1])
+                c1.write(f"{b['bill_id']} | {b['patient']} | LKR {b['final']}")
+                if c2.button("Cancel", key=f"can_{b['bill_id']}"):
+                    if not any(req['bill_id'] == b['bill_id'] for req in st.session_state.cancel_requests):
+                        st.session_state.cancel_requests.append({"bill_id": b['bill_id'], "user": st.session_state.current_user})
+                        st.info("Cancel request sent to Admin!")
+            st.write(f"### Total Sale: LKR {sum(b['final'] for b in u_bills):,.2f}")
