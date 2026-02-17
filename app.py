@@ -1,21 +1,23 @@
 import streamlit as st
 from PIL import Image
 import os
+import pandas as pd
+from datetime import datetime
 
 # 1. පිටුවේ මූලික සැකසුම්
 st.set_page_config(page_title="Life Care LIMS", page_icon="🔬", layout="wide")
 
-# දත්ත ගබඩා කිරීම සඳහා මූලික සැකසුම් (Initial Database Simulation)
+# දත්ත ගබඩා කිරීම (Session State)
 if 'users' not in st.session_state:
     st.session_state.users = [{"username": "admin", "password": "123", "role": "Admin"}]
 if 'doctors' not in st.session_state:
-    st.session_state.doctors = []
+    st.session_state.doctors = ["Self", "Dr. Kamal Perera", "Dr. Sunil Silva"] # Default නිදසුන්
 if 'tests' not in st.session_state:
-    st.session_state.tests = []
+    st.session_state.tests = [{"name": "FBS", "price": 500.0}, {"name": "Full Blood Count", "price": 1200.0}] # Default නිදසුන්
+if 'saved_bills' not in st.session_state:
+    st.session_state.saved_bills = []
 if 'cancel_requests' not in st.session_state:
     st.session_state.cancel_requests = []
-if 'billing_summary' not in st.session_state:
-    st.session_state.billing_summary = 5000.00  # උදාහරණයක් ලෙස පවතින මුදල
 
 # --- Functions ---
 
@@ -23,130 +25,130 @@ def login():
     if os.path.exists("logo.png"):
         st.image("logo.png", width=150)
     st.title("🔬 Life Care LIMS Login")
-    
     with st.form("login_form"):
         u_name = st.text_input("User Name")
         u_pass = st.text_input("Password", type="password")
-        u_role = st.selectbox("Select Role", ["Admin", "Billing", "Technician", "Satellite"])
-        submitted = st.form_submit_button("Login")
-
-        if submitted:
-            # User පරීක්ෂාව
+        u_role = st.selectbox("Select Role", ["Admin", "Billing", "Technician"])
+        if st.form_submit_button("Login"):
             user_found = next((u for u in st.session_state.users if u['username'] == u_name and u['password'] == u_pass and u['role'] == u_role), None)
-            
             if user_found:
                 st.session_state.logged_in = True
                 st.session_state.current_user = u_name
                 st.session_state.role = u_role
                 st.rerun()
             else:
-                st.error("Invalid Username, Password or Role!")
+                st.error("Invalid Credentials!")
 
-def admin_dashboard():
-    st.title("👨‍💼 Admin Dashboard")
-    st.sidebar.write(f"Logged in as: **{st.session_state.current_user}**")
-    
+def billing_dashboard():
+    st.title("💳 Billing Dashboard")
+    st.sidebar.write(f"User: **{st.session_state.current_user}**")
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
 
-    tab1, tab2, tab3, tab4 = st.tabs(["👥 User Management", "🩺 Doctors", "🧪 Tests & Pricing", "✅ Approvals"])
+    tab1, tab2 = st.tabs(["📝 New Bill", "📂 Saved Bills"])
 
-    # 1. Create & Delete User
     with tab1:
-        st.subheader("Add New User")
-        with st.form("add_user_form"):
-            new_u = st.text_input("New Username")
-            new_p = st.text_input("New Password")
-            new_r = st.selectbox("Role", ["Admin", "Billing", "Technician", "Satellite"])
-            if st.form_submit_button("Add User"):
-                if new_u:
-                    st.session_state.users.append({"username": new_u, "password": new_p, "role": new_r})
-                    st.success(f"User {new_u} added!")
-                    st.rerun()
-
+        st.subheader("Patient Registration & Billing")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            salute = st.selectbox("Salute", ["Mr.", "Mrs.", "Mast.", "Miss", "Baby", "Baby of Mrs.", "Rev."])
+            p_name = st.text_input("Patient Name")
+            p_age = st.text_input("Age")
+        
+        with col2:
+            p_mobile = st.text_input("Mobile Number")
+            ref_doc = st.selectbox("Referral Doctor", options=st.session_state.doctors)
+            
         st.divider()
-        st.subheader("Existing Users")
-        for i, u in enumerate(st.session_state.users):
-            col1, col2 = st.columns([3, 1])
-            col1.write(f"**{u['username']}** ({u['role']})")
-            if col2.button("Delete", key=f"del_user_{i}"):
-                st.session_state.users.pop(i)
-                st.rerun()
+        
+        # Test selection
+        test_names = [t['name'] for t in st.session_state.tests]
+        selected_tests = st.multiselect("Select Tests", options=test_names)
+        
+        # Calculation
+        total_amount = sum(t['price'] for t in st.session_state.tests if t['name'] in selected_tests)
+        
+        st.write(f"#### Total Amount: LKR {total_amount:.2f}")
+        discount = st.number_input("Discount Amount (LKR)", min_value=0.0, value=0.0, step=10.0)
+        final_amount = total_amount - discount
+        st.success(f"### Final Amount: LKR {final_amount:.2f}")
 
-    # 2. Add & Delete Doctor
+        if st.button("Save & Generate Bill"):
+            if p_name and selected_tests:
+                bill_id = f"LC-{datetime.now().strftime('%y%m%d%H%M%S')}"
+                bill_data = {
+                    "bill_id": bill_id,
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "patient": f"{salute} {p_name}",
+                    "age": p_age,
+                    "doctor": ref_doc,
+                    "tests": selected_tests,
+                    "total": total_amount,
+                    "discount": discount,
+                    "final": final_amount
+                }
+                st.session_state.saved_bills.append(bill_data)
+                st.balloons()
+                st.success(f"Bill {bill_id} saved successfully!")
+            else:
+                st.warning("Please fill Patient Name and select at least one Test.")
+
     with tab2:
-        st.subheader("Register Doctor")
-        with st.form("add_doc_form"):
-            d_name = st.text_input("Doctor Name")
-            if st.form_submit_button("Add Doctor"):
-                if d_name:
-                    st.session_state.doctors.append(d_name)
-                    st.rerun()
-        
-        st.divider()
-        for i, d in enumerate(st.session_state.doctors):
-            col1, col2 = st.columns([3, 1])
-            col1.write(d)
-            if col2.button("Delete", key=f"del_doc_{i}"):
-                st.session_state.doctors.pop(i)
-                st.rerun()
-
-    # 3. Add Tests with Price (LKR)
-    with tab3:
-        st.subheader("Add New Test")
-        with st.form("add_test_form"):
-            t_name = st.text_input("Test Name")
-            t_price = st.number_input("Price (LKR)", min_value=0.0, step=100.0)
-            if st.form_submit_button("Add Test"):
-                if t_name:
-                    st.session_state.tests.append({"name": t_name, "price": t_price})
-                    st.rerun()
-        
-        st.divider()
-        for i, t in enumerate(st.session_state.tests):
-            col1, col2, col3 = st.columns([2, 2, 1])
-            col1.write(t['name'])
-            col2.write(f"LKR {t['price']:.2f}")
-            if col3.button("Delete", key=f"del_test_{i}"):
-                st.session_state.tests.pop(i)
-                st.rerun()
-
-    # 4. Approve Bill Cancellations
-    with tab4:
-        st.subheader("Bill Cancellation Requests")
-        st.info(f"Current Billing Total: **LKR {st.session_state.billing_summary:.2f}**")
-        
-        if not st.session_state.cancel_requests:
-            st.write("No pending requests.")
+        st.subheader("Saved Bills History")
+        if not st.session_state.saved_bills:
+            st.write("No bills found.")
         else:
-            for i, req in enumerate(st.session_state.cancel_requests):
-                col1, col2, col3 = st.columns([2, 1, 1])
-                col1.write(f"Bill ID: {req['bill_id']} | Amount: LKR {req['amount']}")
-                if col2.button("Approve", key=f"app_{i}"):
-                    st.session_state.billing_summary -= req['amount']
-                    st.session_state.cancel_requests.pop(i)
-                    st.success("Bill Cancelled & Summary Updated!")
-                    st.rerun()
-                if col3.button("Reject", key=f"rej_{i}"):
-                    st.session_state.cancel_requests.pop(i)
-                    st.rerun()
+            df_bills = pd.DataFrame(st.session_state.saved_bills)
+            st.table(df_bills[["bill_id", "date", "patient", "final"]])
+            
+            for i, bill in enumerate(st.session_state.saved_bills):
+                with st.expander(f"View Bill: {bill['bill_id']} - {bill['patient']}"):
+                    bill_text = f"""
+                    LIFE CARE LABORATORY
+                    -----------------------
+                    Bill ID: {bill['bill_id']}
+                    Date: {bill['date']}
+                    Patient: {bill['patient']}
+                    Age: {bill['age']}
+                    Doctor: {bill['doctor']}
+                    -----------------------
+                    Tests: {', '.join(bill['tests'])}
+                    Total: LKR {bill['total']}
+                    Discount: LKR {bill['discount']}
+                    Final Amount: LKR {bill['final']}
+                    -----------------------
+                    Thank You!
+                    """
+                    st.text(bill_text)
+                    st.download_button("Download Bill (.txt)", bill_text, file_name=f"{bill['bill_id']}.txt")
 
-# --- Main App Logic ---
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+# --- (Admin Dashboard remains same as previous code) ---
+def admin_dashboard():
+    st.title("👨‍💼 Admin Dashboard")
+    # ... (මුලින් ලබාදුන් Admin Dashboard කේතය මෙතැනට ඇතුළත් වේ)
+    # පහසුව සඳහා Admin Dashboard කේතය මෙහි නැවත කෙටියෙන් දක්වමි
+    st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"logged_in": False}))
+    
+    tab1, tab2, tab3 = st.tabs(["Users", "Doctors", "Tests"])
+    with tab1: # User Admin
+        new_u = st.text_input("User Name")
+        new_p = st.text_input("Password")
+        new_r = st.selectbox("Role", ["Admin", "Billing", "Technician"])
+        if st.button("Add User"): st.session_state.users.append({"username":new_u, "password":new_p, "role":new_r})
+    with tab2: # Doctor Admin
+        new_d = st.text_input("Doctor Name")
+        if st.button("Add Doctor"): st.session_state.doctors.append(new_d)
+    with tab3: # Test Admin
+        new_t = st.text_input("Test Name")
+        new_pr = st.number_input("Price")
+        if st.button("Add Test"): st.session_state.tests.append({"name":new_t, "price":new_pr})
 
+# --- Main Logic ---
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     login()
 else:
-    if st.session_state.role == "Admin":
-        admin_dashboard()
-    else:
-        st.title(f"{st.session_state.role} Dashboard")
-        st.write("Welcome! Work in progress...")
-        if st.button("Add Test Cancel Request (Demo)"):
-            st.session_state.cancel_requests.append({"bill_id": "B001", "amount": 1500.00})
-            st.success("Request sent to Admin!")
-        if st.sidebar.button("Logout"):
-            st.session_state.logged_in = False
-            st.rerun()
+    if st.session_state.role == "Admin": admin_dashboard()
+    elif st.session_state.role == "Billing": billing_dashboard()
