@@ -7,20 +7,21 @@ from datetime import datetime
 # 1. පිටුවේ මූලික සැකසුම්
 st.set_page_config(page_title="Life Care LIMS", page_icon="🔬", layout="wide")
 
-# දත්ත ගබඩා කිරීම (Session State)
+# දත්ත ගබඩා කිරීම (Session State) - මෙහි දත්ත පවතින්නේ වෙබ් අඩවිය Refresh වන තෙක් පමණි
 if 'users' not in st.session_state:
     st.session_state.users = [{"username": "admin", "password": "123", "role": "Admin"}]
 if 'doctors' not in st.session_state:
-    st.session_state.doctors = ["Self", "Dr. Kamal Perera", "Dr. Sunil Silva"] # Default නිදසුන්
+    # Admin විසින් ඇතුළත් කරන තෙක් පරීක්ෂණ සඳහා නම් කිහිපයක්
+    st.session_state.doctors = ["Self", "Dr. Kamal Perera", "Dr. Sunil Silva"]
 if 'tests' not in st.session_state:
-    st.session_state.tests = [{"name": "FBS", "price": 500.0}, {"name": "Full Blood Count", "price": 1200.0}] # Default නිදසුන්
+    # Admin විසින් ඇතුළත් කරන තෙක් නිදසුන් පරීක්ෂණ
+    st.session_state.tests = [{"name": "FBS", "price": 500.0}, {"name": "Full Blood Count", "price": 1200.0}, {"name": "Lipid Profile", "price": 2500.0}]
 if 'saved_bills' not in st.session_state:
     st.session_state.saved_bills = []
 if 'cancel_requests' not in st.session_state:
     st.session_state.cancel_requests = []
 
-# --- Functions ---
-
+# --- Login Function ---
 def login():
     if os.path.exists("logo.png"):
         st.image("logo.png", width=150)
@@ -37,11 +38,12 @@ def login():
                 st.session_state.role = u_role
                 st.rerun()
             else:
-                st.error("Invalid Credentials!")
+                st.error("පරිශීලක නාමය හෝ මුරපදය වැරදියි!")
 
+# --- Billing Dashboard ---
 def billing_dashboard():
     st.title("💳 Billing Dashboard")
-    st.sidebar.write(f"User: **{st.session_state.current_user}**")
+    st.sidebar.write(f"Logged in as: **{st.session_state.current_user}**")
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
@@ -49,106 +51,148 @@ def billing_dashboard():
     tab1, tab2 = st.tabs(["📝 New Bill", "📂 Saved Bills"])
 
     with tab1:
-        st.subheader("Patient Registration & Billing")
-        col1, col2 = st.columns(2)
-        
-        with col1:
+        st.subheader("Patient Registration")
+        # එක පේළියක කොටස් 3ක් පෙන්වීමට
+        c1, c2, c3 = st.columns([1, 2, 1])
+        with c1:
             salute = st.selectbox("Salute", ["Mr.", "Mrs.", "Mast.", "Miss", "Baby", "Baby of Mrs.", "Rev."])
+        with c2:
             p_name = st.text_input("Patient Name")
+        with c3:
             p_age = st.text_input("Age")
-        
-        with col2:
+
+        c4, c5 = st.columns(2)
+        with c4:
             p_mobile = st.text_input("Mobile Number")
-            ref_doc = st.selectbox("Referral Doctor", options=st.session_state.doctors)
+        with c5:
+            # Admin add කළ doctor list එක මෙතැනට ලැබේ
+            ref_doc = st.selectbox("Referral Doctor (Search & Select)", options=st.session_state.doctors)
             
         st.divider()
+        st.subheader("Test Selection")
         
-        # Test selection
+        # Admin add කළ test list එක මෙතැනට ලැබේ
         test_names = [t['name'] for t in st.session_state.tests]
-        selected_tests = st.multiselect("Select Tests", options=test_names)
+        selected_tests = st.multiselect("Select Tests (Search & Add)", options=test_names)
         
-        # Calculation
+        # තෝරාගත් පරීක්ෂණ වල මුළු එකතුව ගණනය කිරීම
         total_amount = sum(t['price'] for t in st.session_state.tests if t['name'] in selected_tests)
         
         st.write(f"#### Total Amount: LKR {total_amount:.2f}")
-        discount = st.number_input("Discount Amount (LKR)", min_value=0.0, value=0.0, step=10.0)
+        
+        # Discount සහ Final Amount
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            discount = st.number_input("Discount Amount (LKR)", min_value=0.0, value=0.0, step=10.0)
+        
         final_amount = total_amount - discount
-        st.success(f"### Final Amount: LKR {final_amount:.2f}")
+        
+        with col_d2:
+            st.write("#### Final Amount")
+            st.subheader(f"LKR {final_amount:.2f}")
 
         if st.button("Save & Generate Bill"):
             if p_name and selected_tests:
                 bill_id = f"LC-{datetime.now().strftime('%y%m%d%H%M%S')}"
-                bill_data = {
+                new_bill = {
                     "bill_id": bill_id,
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "patient": f"{salute} {p_name}",
                     "age": p_age,
+                    "mobile": p_mobile,
                     "doctor": ref_doc,
                     "tests": selected_tests,
                     "total": total_amount,
                     "discount": discount,
                     "final": final_amount
                 }
-                st.session_state.saved_bills.append(bill_data)
+                st.session_state.saved_bills.append(new_bill)
+                st.success(f"Bill {bill_id} Saved Successfully!")
                 st.balloons()
-                st.success(f"Bill {bill_id} saved successfully!")
             else:
-                st.warning("Please fill Patient Name and select at least one Test.")
+                st.error("කරුණාකර රෝගියාගේ නම සහ අවම වශයෙන් එක් පරීක්ෂණයක්වත් තෝරන්න.")
 
     with tab2:
-        st.subheader("Saved Bills History")
+        st.subheader("Saved Bills")
         if not st.session_state.saved_bills:
-            st.write("No bills found.")
+            st.info("තවමත් බිල්පත් කිසිවක් සුරැකී නැත.")
         else:
-            df_bills = pd.DataFrame(st.session_state.saved_bills)
-            st.table(df_bills[["bill_id", "date", "patient", "final"]])
-            
-            for i, bill in enumerate(st.session_state.saved_bills):
-                with st.expander(f"View Bill: {bill['bill_id']} - {bill['patient']}"):
-                    bill_text = f"""
+            for i, bill in enumerate(reversed(st.session_state.saved_bills)):
+                with st.expander(f"Bill ID: {bill['bill_id']} | Patient: {bill['patient']}"):
+                    # බිල්පත ලස්සනට පෙන්වීම
+                    bill_content = f"""
                     LIFE CARE LABORATORY
-                    -----------------------
-                    Bill ID: {bill['bill_id']}
-                    Date: {bill['date']}
-                    Patient: {bill['patient']}
-                    Age: {bill['age']}
-                    Doctor: {bill['doctor']}
-                    -----------------------
-                    Tests: {', '.join(bill['tests'])}
-                    Total: LKR {bill['total']}
-                    Discount: LKR {bill['discount']}
-                    Final Amount: LKR {bill['final']}
-                    -----------------------
+                    -------------------------------
+                    Bill ID    : {bill['bill_id']}
+                    Date       : {bill['date']}
+                    Patient    : {bill['patient']}
+                    Age/Mobile : {bill['age']} / {bill['mobile']}
+                    Doctor     : {bill['doctor']}
+                    -------------------------------
+                    Tests      : {', '.join(bill['tests'])}
+                    -------------------------------
+                    Total Amount : LKR {bill['total']:.2f}
+                    Discount     : LKR {bill['discount']:.2f}
+                    Final Amount : LKR {bill['final']:.2f}
+                    -------------------------------
                     Thank You!
                     """
-                    st.text(bill_text)
-                    st.download_button("Download Bill (.txt)", bill_text, file_name=f"{bill['bill_id']}.txt")
+                    st.text(bill_content)
+                    st.download_button(
+                        label="Download & Print Bill",
+                        data=bill_content,
+                        file_name=f"Bill_{bill['bill_id']}.txt",
+                        mime="text/plain",
+                        key=f"dl_{i}"
+                    )
 
-# --- (Admin Dashboard remains same as previous code) ---
+# --- Admin Dashboard ---
 def admin_dashboard():
     st.title("👨‍💼 Admin Dashboard")
-    # ... (මුලින් ලබාදුන් Admin Dashboard කේතය මෙතැනට ඇතුළත් වේ)
-    # පහසුව සඳහා Admin Dashboard කේතය මෙහි නැවත කෙටියෙන් දක්වමි
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"logged_in": False}))
     
-    tab1, tab2, tab3 = st.tabs(["Users", "Doctors", "Tests"])
-    with tab1: # User Admin
-        new_u = st.text_input("User Name")
-        new_p = st.text_input("Password")
-        new_r = st.selectbox("Role", ["Admin", "Billing", "Technician"])
-        if st.button("Add User"): st.session_state.users.append({"username":new_u, "password":new_p, "role":new_r})
-    with tab2: # Doctor Admin
-        new_d = st.text_input("Doctor Name")
-        if st.button("Add Doctor"): st.session_state.doctors.append(new_d)
-    with tab3: # Test Admin
-        new_t = st.text_input("Test Name")
-        new_pr = st.number_input("Price")
-        if st.button("Add Test"): st.session_state.tests.append({"name":new_t, "price":new_pr})
+    t1, t2, t3, t4 = st.tabs(["User Management", "Add Doctor", "Add Tests", "Approvals"])
+    
+    with t1:
+        st.subheader("Create New User")
+        nu = st.text_input("New Username")
+        np = st.text_input("New Password", type="password")
+        nr = st.selectbox("Role", ["Admin", "Billing", "Technician"])
+        if st.button("Add User"):
+            st.session_state.users.append({"username": nu, "password": np, "role": nr})
+            st.success("User added!")
+            
+    with t2:
+        st.subheader("Register New Doctor")
+        nd = st.text_input("Doctor Name")
+        if st.button("Add Doctor"):
+            st.session_state.doctors.append(nd)
+            st.success(f"{nd} added to system.")
+            
+    with t3:
+        st.subheader("Add Test with Price")
+        nt = st.text_input("Test Name")
+        npr = st.number_input("Price (LKR)", min_value=0.0)
+        if st.button("Add Test"):
+            st.session_state.tests.append({"name": nt, "price": npr})
+            st.success(f"{nt} added with price LKR {npr}")
+
+    with t4:
+        st.subheader("Pending Approvals")
+        st.write("No cancellation requests at the moment.")
 
 # --- Main Logic ---
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
 if not st.session_state.logged_in:
     login()
 else:
-    if st.session_state.role == "Admin": admin_dashboard()
-    elif st.session_state.role == "Billing": billing_dashboard()
+    if st.session_state.role == "Admin":
+        admin_dashboard()
+    elif st.session_state.role == "Billing":
+        billing_dashboard()
+    else:
+        st.title("Technician Portal")
+        st.write("Results entry coming soon...")
+        st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"logged_in": False}))
