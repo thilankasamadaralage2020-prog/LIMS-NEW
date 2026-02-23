@@ -16,18 +16,18 @@ if 'report_data' not in st.session_state: st.session_state.report_data = {}
 if 'users' not in st.session_state: 
     st.session_state.users = [{"username": "admin", "password": "123", "role": "Admin"}]
 
-# --- FBC Reference Ranges (Based on your formats) ---
+# --- FBC Reference Ranges (Based on your excel files) ---
 FBC_RANGES = {
     "Baby": {
-        "WBC": "5,000 – 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01",
+        "WBC": "5,000 - 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01",
         "RBC": "4.0 - 5.2", "HB": "11.5 - 15.5", "PCV": "35.0 - 45.0", "MCV": "77.0 - 95.0", "MCH": "25.0 - 33.0", "MCHC": "31.0 - 37.0", "PLT": "150,000 - 450,000"
     },
     "Male": {
-        "WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01",
+        "WBC": "4,000 - 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01",
         "RBC": "4.5 - 5.6", "HB": "13.0 - 17.0", "PCV": "40.0 - 50.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "PLT": "150,000 - 400,000"
     },
     "Female": {
-        "WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01",
+        "WBC": "4,000 - 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01",
         "RBC": "3.9 - 4.5", "HB": "11.5 - 15.5", "PCV": "35.0 - 45.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "PLT": "150,000 - 400,000"
     }
 }
@@ -66,7 +66,12 @@ def create_report_pdf(bill, res, fmt):
     pdf.ln(10); pdf.set_font("Arial", 'BU', 12); pdf.cell(0, 10, "FULL BLOOD COUNT", ln=True, align='C'); pdf.ln(5)
     pdf.set_font("Arial", 'B', 10); pdf.cell(70, 8, "TEST DESCRIPTION", 1); pdf.cell(30, 8, "RESULT", 1, 0, 'C'); pdf.cell(40, 8, "UNIT", 1, 0, 'C'); pdf.cell(50, 8, "REF. RANGE", 1, 1, 'C')
     ranges = FBC_RANGES[fmt]
-    params = [("WHITE BLOOD CELLS", "WBC", "cells/cu.mm"), ("NEUTROPHILS", "NEU", "%"), ("LYMPHOCYTES", "LYM", "%"), ("RED BLOOD CELLS", "RBC", "mill/ cu.mm"), ("HAEMOGLOBIN", "HB", "g/dl"), ("PLATELET COUNT", "PLT", "/cu.mm")]
+    params = [
+        ("WHITE BLOOD CELLS", "WBC", "cells/cu.mm"), ("NEUTROPHILS", "NEU", "%"), 
+        ("LYMPHOCYTES", "LYM", "%"), ("MONOCYTES", "MON", "%"), ("EOSINOPHILS", "EOS", "%"),
+        ("RED BLOOD CELLS", "RBC", "mill/ cu.mm"), ("HAEMOGLOBIN", "HB", "g/dl"), 
+        ("PACKED CELL VOLUME", "PCV", "%"), ("PLATELET COUNT", "PLT", "/cu.mm")
+    ]
     pdf.set_font("Arial", '', 10)
     for label, key, unit in params:
         pdf.cell(70, 8, label, 1); pdf.cell(30, 8, str(res.get(key, '')), 1, 0, 'C'); pdf.cell(40, 8, unit, 1, 0, 'C'); pdf.cell(50, 8, ranges[key], 1, 1, 'C')
@@ -82,7 +87,7 @@ if not st.session_state.logged_in:
 else:
     if st.sidebar.button("Logout"): st.session_state.logged_in = False; st.rerun()
 
-    # --- ADMIN DASHBOARD ---
+    # --- ADMIN DASHBOARD (Unchanged) ---
     if st.session_state.role == "Admin":
         st.title("👨‍💼 Admin Dashboard")
         t1, t2, t3, t4, t5 = st.tabs(["Users", "Doctors", "Tests", "✅ Approvals", "🛠 Edit Bill"])
@@ -116,7 +121,7 @@ else:
                     en = st.text_input("Edit Name", value=target['patient'])
                     if st.button("Update Bill"): target.update({"patient": en}); st.success("Updated!"); st.rerun()
 
-    # --- BILLING DASHBOARD ---
+    # --- BILLING DASHBOARD (Unchanged) ---
     elif st.session_state.role == "Billing":
         st.title("💳 Billing Dashboard")
         t_new, t_saved, t_recall, t_summary = st.tabs(["📝 New Bill", "📂 Saved Bills", "🔍 RECALL", "📊 Summary"])
@@ -129,41 +134,82 @@ else:
             ptests = st.multiselect("Tests", options=[t['name'] for t in st.session_state.tests], key="ptests")
             total = sum(t['price'] for t in st.session_state.tests if t['name'] in ptests)
             disc = st.number_input("Discount", 0.0, key="pdisc")
-            st.write(f"### Final: LKR {total-disc:,.2f}")
+            st.write(f"### Final Amount: LKR {total - disc:,.2f}")
             if st.button("Save & Print"):
-                bid = f"LC{datetime.now().strftime('%y%m%d%H%M%S')}"
-                st.session_state.saved_bills.append({"bill_id": bid, "date": date.today().isoformat(), "patient": f"{salute} {p_name}", "age_y": ay, "age_m": am, "doctor": pdoc, "tests": ptests, "final": total-disc, "user": st.session_state.current_user})
-                st.success("Saved!"); st.rerun()
+                if p_name and ptests:
+                    bid = f"LC{datetime.now().strftime('%y%m%d%H%M%S')}"
+                    st.session_state.saved_bills.append({"bill_id": bid, "date": date.today().isoformat(), "patient": f"{salute} {p_name}", "age_y": ay, "age_m": am, "doctor": pdoc, "tests": ptests, "final": total - disc, "user": st.session_state.current_user})
+                    st.success("Saved!"); st.rerun()
         with t_saved:
             for b in reversed([x for x in st.session_state.saved_bills if x['user'] == st.session_state.current_user]):
-                st.write(f"{b['bill_id']} | {b['patient']}"); st.download_button("PDF", create_bill_pdf(b), file_name=f"{b['bill_id']}.pdf", key=f"s_{b['bill_id']}")
+                c1, c2 = st.columns([4, 1]); c1.write(f"**{b['bill_id']}** | {b['patient']}"); c2.download_button("PDF", create_bill_pdf(b), file_name=f"{b['bill_id']}.pdf", key=f"s_{b['bill_id']}")
 
-    # --- TECHNICIAN DASHBOARD ---
+    # --- TECHNICIAN DASHBOARD (Updated Logic) ---
     elif st.session_state.role == "Technician":
         st.title("🔬 Technician Dashboard")
-        pending = [b for b in st.session_state.saved_bills if "FBC" in b['tests'] and b['bill_id'] not in st.session_state.report_data]
-        st.subheader("📋 Pending Tests")
-        for b in pending:
-            c1, c2 = st.columns([4, 1]); c1.write(f"**{b['bill_id']}** | {b['patient']}"); 
-            if c2.button("Enter Result", key=f"e_{b['bill_id']}"): st.session_state.active_rid = b['bill_id']
         
-        if 'active_rid' in st.session_state:
-            bill = next(x for x in pending if x['bill_id'] == st.session_state.active_rid)
-            fmt = "Baby" if bill['age_y'] < 5 else ("Male" if "Mr." in bill['patient'] or "Baby" in bill['patient'] else "Female")
-            with st.form("fbc_form"):
-                st.subheader(f"FBC Results - {bill['patient']} ({fmt})")
-                c1, c2 = st.columns(2); wbc = c1.text_input("WBC"); hb = c2.text_input("HB"); plt = c1.text_input("PLT")
-                if st.form_submit_button("Authorize"):
-                    st.session_state.report_data[bill['bill_id']] = {"res": {"WBC":wbc, "HB":hb, "PLT":plt}, "fmt": fmt}; del st.session_state.active_rid; st.rerun()
+        # Display ALL bills that have at least one test pending (not in report_data)
+        st.subheader("📋 Pending Tests")
+        pending_bills = [b for b in st.session_state.saved_bills if b['bill_id'] not in st.session_state.report_data]
+        
+        if pending_bills:
+            for b in pending_bills:
+                with st.container():
+                    c1, c2 = st.columns([4, 1])
+                    c1.write(f"**ID:** {b['bill_id']} | **Patient:** {b['patient']} | **Tests:** {', '.join(b['tests'])}")
+                    if c2.button("Enter Result", key=f"e_{b['bill_id']}"):
+                        st.session_state.active_rid = b['bill_id']
+            
+            # Result Entry Form
+            if 'active_rid' in st.session_state:
+                st.divider()
+                bill = next(x for x in pending_bills if x['bill_id'] == st.session_state.active_rid)
+                # Auto-Format detection based on age and salute
+                is_baby = bill['age_y'] < 5
+                is_male = "Mr." in bill['patient'] or "Baby" in bill['patient']
+                fmt = "Baby" if is_baby else ("Male" if is_male else "Female")
+                
+                st.subheader(f"📝 Result Entry: {bill['patient']} ({fmt} Format)")
+                with st.form("fbc_form"):
+                    c1, c2, c3 = st.columns(3)
+                    wbc = c1.text_input("WBC (cells/cu.mm)")
+                    neu = c2.text_input("NEU %")
+                    lym = c3.text_input("LYM %")
+                    mon = c1.text_input("MON %")
+                    eos = c2.text_input("EOS %")
+                    bas = c3.text_input("BAS %")
+                    rbc = c1.text_input("RBC (mill/cu.mm)")
+                    hb = c2.text_input("HB (g/dl)")
+                    pcv = c3.text_input("PCV %")
+                    plt = c1.text_input("PLT (/cu.mm)")
+                    
+                    if st.form_submit_button("Authorize Report"):
+                        res_dict = {"WBC": wbc, "NEU": neu, "LYM": lym, "MON": mon, "EOS": eos, "BAS": bas, "RBC": rbc, "HB": hb, "PCV": pcv, "PLT": plt}
+                        st.session_state.report_data[bill['bill_id']] = {"res": res_dict, "fmt": fmt}
+                        del st.session_state.active_rid
+                        st.success("Report Authorized!"); st.rerun()
+        else:
+            st.info("No pending tests found.")
 
-    # --- SATELLITE DASHBOARD ---
+        # Authorized reports section
+        st.divider()
+        st.subheader("🖨 Authorized Reports")
+        for rid, data in st.session_state.report_data.items():
+            b_orig = next((x for x in st.session_state.saved_bills if x['bill_id'] == rid), None)
+            if b_orig:
+                c1, c2 = st.columns([4, 1])
+                c1.write(f"✅ {rid} - {b_orig['patient']}")
+                c2.download_button("Print PDF", create_report_pdf(b_orig, data['res'], data['fmt']), file_name=f"Report_{rid}.pdf", key=f"p_{rid}")
+
+    # --- SATELLITE DASHBOARD (Unchanged) ---
     elif st.session_state.role == "Satellite":
         st.title("📡 Satellite Dashboard")
         sval = st.text_input("Search Patient Name or Ref No")
         if sval:
             res = [b for b in st.session_state.saved_bills if sval.lower() in b['patient'].lower() or sval.upper() in b['bill_id']]
             for r in res:
-                c1, c2 = st.columns([4, 1]); c1.write(f"{r['bill_id']} | {r['patient']}")
+                c1, c2 = st.columns([4, 1]); c1.write(f"**{r['bill_id']}** | {r['patient']}")
                 if r['bill_id'] in st.session_state.report_data:
                     rep = st.session_state.report_data[r['bill_id']]
                     c2.download_button("Report", create_report_pdf(r, rep['res'], rep['fmt']), key=f"sat_{r['bill_id']}")
+                else: c2.warning("Pending")
