@@ -54,7 +54,7 @@ def create_bill_pdf(bill):
         pdf.cell(140, 8, "Sub Total (LKR):", 0, 0, 'R'); pdf.cell(40, 8, f"{subtotal:,.2f}", 0, 1, 'R')
         pdf.cell(140, 8, f"Discount (LKR):", 0, 0, 'R'); pdf.cell(40, 8, f"-{bill['discount']:,.2f}", 0, 1, 'R')
     pdf.set_font("Arial", 'B', 12); pdf.cell(140, 10, "Total Amount (LKR):", 0, 0, 'R'); pdf.cell(40, 10, f"{bill['final']:,.2f}", 0, 1, 'R')
-    return pdf.output(dest='S').encode('latin-1')
+    return pdf.output(dest='S').encode('utf-8', errors='ignore')
 
 def create_report_pdf(bill, res, abs_c, fmt, comment):
     pdf = FPDF()
@@ -88,14 +88,22 @@ def create_report_pdf(bill, res, abs_c, fmt, comment):
     for label, key, unit, is_abs in params:
         pdf.cell(60, 7, label)
         val = res.get(key, '-')
-        # Report formatting: Integers for WBC/Diff
-        f_val = f"{int(val):02d}" if key in ["WBC", "NEU", "LYM", "MON", "EOS", "BAS"] and val != '-' and val is not None else str(val)
+        # 1. WBC/Differential සඳහා අනිවාර්යෙන්ම ඉලක්කම් දෙකක් පෙන්වීම (උදා: 04)
+        if key in ["WBC", "NEU", "LYM", "MON", "EOS", "BAS"] and val != '-' and val is not None:
+            f_val = f"{int(float(val)):02d}"
+        else:
+            f_val = str(val)
+        
         pdf.cell(25, 7, f_val, 0, 0, 'C')
         pdf.cell(35, 7, str(abs_c.get(key, '')) if is_abs else "", 0, 0, 'C')
         pdf.cell(25, 7, unit, 0, 0, 'C')
         pdf.cell(45, 7, ranges.get(key, ''), 0, 1, 'C')
-    if comment: pdf.ln(10); pdf.set_font("Arial", 'B', 10); pdf.cell(0, 6, "Comments:"); pdf.set_font("Arial", '', 10); pdf.multi_cell(0, 5, comment)
-    return pdf.output(dest='S').encode('latin-1')
+    
+    if comment: 
+        pdf.ln(10); pdf.set_font("Arial", 'B', 10); pdf.cell(0, 6, "Comments:"); pdf.set_font("Arial", '', 10); pdf.multi_cell(0, 5, comment)
+    
+    # 2. Encoding එක utf-8 ලෙස වෙනස් කර Unicode දෝෂය (Error) විසඳීම
+    return pdf.output(dest='S').encode('utf-8', errors='ignore')
 
 def get_pdf_download_link(pdf_bytes, filename):
     b64 = base64.b64encode(pdf_bytes).decode(); return f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">Click here to Download PDF</a>'
@@ -111,7 +119,6 @@ if not st.session_state.logged_in:
 else:
     if st.sidebar.button("Logout"): st.session_state.logged_in = False; st.rerun()
 
-    # Admin & Billing sections (Unchanged as per request)
     if st.session_state.role == "Admin":
         st.title("👨‍💼 Admin Dashboard")
         t1, t2, t3 = st.tabs(["Users", "Doctors", "Tests"])
@@ -159,7 +166,6 @@ else:
                 def fbc_row(label, key, unit, is_int=True):
                     c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 2, 3])
                     c1.write(f"**{label}**")
-                    # Empty box logic: value=None and step=1 for integers
                     val = c2.number_input("", key=f"in_{key}", label_visibility="collapsed", value=None, step=1 if is_int else 0.01)
                     c3.write(""); c4.write(unit); c5.write(ranges.get(key, ''))
                     return val
@@ -181,7 +187,6 @@ else:
                 
                 comment = st.text_area("Comments")
                 if st.form_submit_button("Authorize Report"):
-                    # Calculations
                     abs_dict = {}
                     if wbc:
                         for k, v in {"NEU": neu, "LYM": lym, "MON": mon, "EOS": eos, "BAS": bas}.items():
@@ -192,7 +197,6 @@ else:
                     st.session_state.last_authorized = bill['bill_id']
                     st.session_state.active_rid = None; st.rerun()
 
-        # FIXED: Authorization Display Section
         if 'last_authorized' in st.session_state:
             rid = st.session_state.last_authorized
             b_orig = next((x for x in st.session_state.saved_bills if x['bill_id'] == rid), None)
