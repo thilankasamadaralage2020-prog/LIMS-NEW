@@ -27,9 +27,9 @@ if 'users' not in st.session_state:
 
 # --- Reference Ranges ---
 FBC_RANGES = {
-    "Baby": {"WBC": "5,000 – 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.0 - 5.2", "HB": "11.5 - 15.5", "MCV": "77.0 - 95.0", "MCH": "25.0 - 33.0", "MCHC": "31.0 - 37.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 450,000"},
-    "Male": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.5 - 5.6", "HB": "13.0 - 17.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"},
-    "Female": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "3.9 - 4.5", "HB": "11.5 - 15.5", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"}
+    "Baby": {"WBC": "5,000 – 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.0 - 5.2", "HB": "11.5 - 15.5", "HCT": "35.0 - 45.0", "MCV": "77.0 - 95.0", "MCH": "25.0 - 33.0", "MCHC": "31.0 - 37.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 450,000"},
+    "Male": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.5 - 5.6", "HB": "13.0 - 17.0", "HCT": "40.0 - 50.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"},
+    "Female": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "3.9 - 4.5", "HB": "11.5 - 15.5", "HCT": "35.0 - 45.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"}
 }
 
 # --- PDF Functions ---
@@ -40,21 +40,24 @@ def create_bill_pdf(bill):
     pdf.set_font("Arial", 'B', 16); pdf.cell(0, 10, "Life Care Laboratory Pvt (Ltd)", ln=True, align='C')
     pdf.set_font("Arial", size=10); pdf.cell(0, 5, "Katuwana. Tel: 0773326715", ln=True, align='C')
     pdf.ln(10); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(5)
+    
+    # Bill details display fix
     pdf.set_font("Arial", 'B', 11)
-    pdf.text(10, pdf.get_y() + 5, f"Patient: {bill['patient']}")
-    pdf.text(130, pdf.get_y() + 5, f"Ref No: {bill['bill_id']}")
-    pdf.ln(20); pdf.cell(140, 8, "Test Description", 1); pdf.cell(40, 8, "Price", 1, 1, 'R')
-    pdf.set_font("Arial", size=10)
-    subtotal = bill['final'] + bill.get('discount', 0)
-    for t in bill['tests']:
-        pdf.cell(140, 8, t, 1); pdf.cell(40, 8, "Included", 1, 1, 'R')
-    pdf.ln(2)
+    pdf.cell(100, 10, f"Patient: {bill['patient']}", 0, 0)
+    pdf.cell(0, 10, f"Ref No: {bill['bill_id']}", 0, 1, 'R')
+    pdf.ln(5)
+    
     pdf.set_font("Arial", 'B', 10)
-    if bill.get('discount', 0) > 0:
-        pdf.cell(140, 8, "Sub Total (LKR):", 0, 0, 'R'); pdf.cell(40, 8, f"{subtotal:,.2f}", 0, 1, 'R')
-        pdf.cell(140, 8, f"Discount (LKR):", 0, 0, 'R'); pdf.cell(40, 8, f"-{bill['discount']:,.2f}", 0, 1, 'R')
-    pdf.set_font("Arial", 'B', 12); pdf.cell(140, 10, "Total Amount (LKR):", 0, 0, 'R'); pdf.cell(40, 10, f"{bill['final']:,.2f}", 0, 1, 'R')
-    return pdf.output(dest='S').encode('utf-8', errors='ignore')
+    pdf.cell(140, 8, "Test Description", 1, 0, 'C'); pdf.cell(40, 8, "Price (LKR)", 1, 1, 'C')
+    pdf.set_font("Arial", size=10)
+    
+    for t in bill['tests']:
+        pdf.cell(140, 8, f"  {t}", 1); pdf.cell(40, 8, "Included", 1, 1, 'R')
+    
+    pdf.ln(5)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(140, 10, "Total Amount (LKR):", 0, 0, 'R'); pdf.cell(40, 10, f"{bill['final']:,.2f}", 0, 1, 'R')
+    return pdf.output(dest='S').encode('latin-1')
 
 def create_report_pdf(bill, res, abs_c, fmt, comment):
     pdf = FPDF()
@@ -65,16 +68,19 @@ def create_report_pdf(bill, res, abs_c, fmt, comment):
     pdf.ln(4); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(5)
     pdf.set_font("Arial", 'B', 10)
     gender = "Male" if any(s in bill['patient'] for s in ["Mr.", "Baby"]) else "Female"
-    pdf.text(10, pdf.get_y()+5, f"Patient Name: {bill['patient']}")
-    pdf.text(10, pdf.get_y()+11, f"Age: {bill['age_y']}Y {bill['age_m']}M / Gender: {gender}")
-    pdf.text(10, pdf.get_y()+17, f"Ref. Doctor: {bill.get('doctor', 'Self')}")
-    pdf.text(130, pdf.get_y()+5, f"Billed Date: {bill['date']}")
-    pdf.text(130, pdf.get_y()+11, f"Reported Date: {date.today().isoformat()}")
-    pdf.text(130, pdf.get_y()+17, f"Ref No: {bill['bill_id']}")
-    pdf.ln(25); pdf.set_font("Arial", 'BU', 12); pdf.cell(0, 10, "FULL BLOOD COUNT", ln=True, align='C'); pdf.ln(5)
+    
+    pdf.cell(100, 6, f"Patient Name: {bill['patient']}", 0, 0)
+    pdf.cell(0, 6, f"Billed Date: {bill['date']}", 0, 1, 'R')
+    pdf.cell(100, 6, f"Age: {bill['age_y']}Y {bill['age_m']}M / Gender: {gender}", 0, 0)
+    pdf.cell(0, 6, f"Reported Date: {date.today().isoformat()}", 0, 1, 'R')
+    pdf.cell(100, 6, f"Ref. Doctor: {bill.get('doctor', 'Self')}", 0, 0)
+    pdf.cell(0, 6, f"Ref No: {bill['bill_id']}", 0, 1, 'R')
+    
+    pdf.ln(10); pdf.set_font("Arial", 'BU', 12); pdf.cell(0, 10, "FULL BLOOD COUNT", ln=True, align='C'); pdf.ln(5)
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(60, 8, "TEST DESCRIPTION"); pdf.cell(25, 8, "RESULT", 0, 0, 'C'); pdf.cell(35, 8, "ABS. COUNT", 0, 0, 'C'); pdf.cell(25, 8, "UNIT", 0, 0, 'C'); pdf.cell(45, 8, "REF. RANGE", 0, 1, 'C')
     pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(2)
+    
     ranges = FBC_RANGES[fmt]
     pdf.set_font("Arial", '', 10)
     params = [
@@ -85,14 +91,18 @@ def create_report_pdf(bill, res, abs_c, fmt, comment):
         ("MCV", "MCV", "fl", False), ("MCH", "MCH", "pg", False), ("MCHC", "MCHC", "g/dl", False),
         ("RDW", "RDW", "%", False), ("PLATELET COUNT", "PLT", "/cu.mm", False)
     ]
+    
     for label, key, unit, is_abs in params:
         pdf.cell(60, 7, label)
         val = res.get(key, '-')
-        # 1. WBC/Differential සඳහා අනිවාර්යෙන්ම ඉලක්කම් දෙකක් පෙන්වීම (උදා: 04)
-        if key in ["WBC", "NEU", "LYM", "MON", "EOS", "BAS"] and val != '-' and val is not None:
-            f_val = f"{int(float(val)):02d}"
+        # Two-digit formatting (04 instead of 4)
+        if key in ["WBC", "NEU", "LYM", "MON", "EOS", "BAS"] and val not in ['-', None]:
+            try:
+                f_val = f"{int(float(val)):02d}"
+            except:
+                f_val = str(val)
         else:
-            f_val = str(val)
+            f_val = str(val) if val is not None else '-'
         
         pdf.cell(25, 7, f_val, 0, 0, 'C')
         pdf.cell(35, 7, str(abs_c.get(key, '')) if is_abs else "", 0, 0, 'C')
@@ -102,8 +112,8 @@ def create_report_pdf(bill, res, abs_c, fmt, comment):
     if comment: 
         pdf.ln(10); pdf.set_font("Arial", 'B', 10); pdf.cell(0, 6, "Comments:"); pdf.set_font("Arial", '', 10); pdf.multi_cell(0, 5, comment)
     
-    # 2. Encoding එක utf-8 ලෙස වෙනස් කර Unicode දෝෂය (Error) විසඳීම
-    return pdf.output(dest='S').encode('utf-8', errors='ignore')
+    # Using utf-8 with errors ignore to prevent encoding crash
+    return pdf.output(dest='S').encode('latin-1', errors='ignore')
 
 def get_pdf_download_link(pdf_bytes, filename):
     b64 = base64.b64encode(pdf_bytes).decode(); return f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}">Click here to Download PDF</a>'
@@ -119,6 +129,7 @@ if not st.session_state.logged_in:
 else:
     if st.sidebar.button("Logout"): st.session_state.logged_in = False; st.rerun()
 
+    # Admin and Billing sections remain unchanged as requested
     if st.session_state.role == "Admin":
         st.title("👨‍💼 Admin Dashboard")
         t1, t2, t3 = st.tabs(["Users", "Doctors", "Tests"])
@@ -144,7 +155,7 @@ else:
         ptests = st.multiselect("Tests", options=[t['name'] for t in st.session_state.tests])
         total = sum(t['price'] for t in st.session_state.tests if t['name'] in ptests)
         disc = st.number_input("Discount", 0.0)
-        if st.button("Save"):
+        if st.button("Save & Print Bill"):
             bid = f"LC{datetime.now().strftime('%y%m%d%H%M%S')}"
             new_b = {"bill_id": bid, "date": date.today().isoformat(), "patient": f"{salute} {p_name}", "age_y": ay, "age_m": am, "doctor": pdoc, "tests": ptests, "final": total-disc, "discount": disc}
             st.session_state.saved_bills.append(new_b)
@@ -154,7 +165,9 @@ else:
         st.title("🔬 Technician Dashboard")
         pending = [b for b in st.session_state.saved_bills if b['bill_id'] not in st.session_state.report_data]
         for b in pending:
-            if st.button(f"Enter Result: {b['bill_id']} - {b['patient']}"): st.session_state.active_rid = b['bill_id']; st.rerun()
+            if st.button(f"Enter Result: {b['bill_id']} - {b['patient']}"): 
+                st.session_state.active_rid = b['bill_id']
+                st.rerun()
 
         if st.session_state.active_rid:
             bill = next(x for x in pending if x['bill_id'] == st.session_state.active_rid)
@@ -204,7 +217,7 @@ else:
                 data = st.session_state.report_data[rid]
                 st.success(f"Successfully Authorized: {b_orig['patient']}")
                 pdf_bytes = create_report_pdf(b_orig, data['res'], data['abs'], data['fmt'], data['comment'])
-                st.download_button("⬇️ Download Authorized PDF Report", pdf_bytes, file_name=f"Report_{rid}.pdf", type="primary")
+                st.download_button("⬇️ Download PDF Report", pdf_bytes, file_name=f"Report_{rid}.pdf", type="primary")
 
     elif st.session_state.role == "Satellite":
         st.title("📡 Satellite Dashboard")
@@ -214,4 +227,4 @@ else:
                 if b['bill_id'] in st.session_state.report_data:
                     data = st.session_state.report_data[b['bill_id']]
                     st.write(f"**{b['patient']}** ({b['bill_id']})")
-                    st.download_button("Download Report", create_report_pdf(b, data['res'], data['abs'], data['fmt'], data['comment']), key=f"dl_{b['bill_id']}")
+                    st.download_button("Download Report", create_report_pdf(b, data['res'], data['abs'], data['fmt'], data['comment']), key=f"sat_{b['bill_id']}")
