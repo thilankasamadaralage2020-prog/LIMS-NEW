@@ -7,7 +7,7 @@ import base64
 # 1. Page Configuration
 st.set_page_config(page_title="Life Care LIMS", page_icon="🔬", layout="wide")
 
-# Session State Initialize (Keeping existing states)
+# Session State Initialize
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'saved_bills' not in st.session_state: st.session_state.saved_bills = []
 if 'tests' not in st.session_state: st.session_state.tests = []
@@ -18,14 +18,14 @@ if 'active_rid' not in st.session_state: st.session_state.active_rid = None
 if 'users' not in st.session_state: 
     st.session_state.users = [{"username": "admin", "password": "123", "role": "Admin"}]
 
-# --- Reference Ranges (As per your request) ---
+# --- Reference Ranges ---
 FBC_RANGES = {
-    "Baby": {"WBC": "5,000 - 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.0 - 5.2", "HB": "11.5 - 15.5", "MCV": "77.0 - 95.0", "MCH": "25.0 - 33.0", "MCHC": "31.0 - 37.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 450,000"},
-    "Male": {"WBC": "4,000 - 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.5 - 5.6", "HB": "13.0 - 17.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"},
-    "Female": {"WBC": "4,000 - 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "3.9 - 4.5", "HB": "11.5 - 15.5", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"}
+    "Baby": {"WBC": "5,000 – 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.0 - 5.2", "HB": "11.5 - 15.5", "HCT": "35.0 - 45.0", "MCV": "77.0 - 95.0", "MCH": "25.0 - 33.0", "MCHC": "31.0 - 37.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 450,000"},
+    "Male": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.5 - 5.6", "HB": "13.0 - 17.0", "HCT": "40.0 - 50.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"},
+    "Female": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "3.9 - 4.5", "HB": "11.5 - 15.5", "HCT": "35.0 - 45.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"}
 }
 
-# --- PDF Functions ---
+# --- PDF Generation Functions ---
 def create_bill_pdf(bill):
     pdf = FPDF()
     pdf.add_page()
@@ -50,7 +50,6 @@ def create_report_pdf(bill, res, abs_c, fmt, comment):
     pdf.set_font("Arial", '', 9); pdf.cell(0, 5, "Katuwana. Tel: 0773326715", ln=True, align='C')
     pdf.ln(4); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(5)
     
-    # Header
     pdf.set_font("Arial", 'B', 10)
     gender = "Male" if "Mr." in bill['patient'] or "Baby" in bill['patient'] else "Female"
     pdf.text(10, pdf.get_y()+5, f"Patient Name: {bill['patient']}")
@@ -62,7 +61,6 @@ def create_report_pdf(bill, res, abs_c, fmt, comment):
     
     pdf.ln(25); pdf.set_font("Arial", 'BU', 12); pdf.cell(0, 10, "FULL BLOOD COUNT", ln=True, align='C'); pdf.ln(5)
     
-    # Report Table (Clean Style - No internal lines)
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(60, 8, "TEST DESCRIPTION"); pdf.cell(25, 8, "RESULT", 0, 0, 'C'); pdf.cell(35, 8, "ABS. COUNT", 0, 0, 'C'); pdf.cell(25, 8, "UNIT", 0, 0, 'C'); pdf.cell(45, 8, "REF. RANGE", 0, 1, 'C')
     pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(2)
@@ -81,12 +79,21 @@ def create_report_pdf(bill, res, abs_c, fmt, comment):
 
     for label, key, unit, is_abs in params:
         pdf.cell(60, 7, label)
-        pdf.cell(25, 7, str(res.get(key, '-')), 0, 0, 'C')
+        val = res.get(key, '-')
+        # Requirement: Double digits for WBC and Diff Count
+        if key in ["WBC", "NEU", "LYM", "MON", "EOS", "BAS"] and val != '-':
+            try: formatted_val = f"{int(float(val)):02d}"
+            except: formatted_val = str(val)
+        else:
+            formatted_val = str(val)
+            
+        pdf.cell(25, 7, formatted_val, 0, 0, 'C')
         pdf.cell(35, 7, str(abs_c.get(key, '')) if is_abs else "", 0, 0, 'C')
         pdf.cell(25, 7, unit, 0, 0, 'C')
         pdf.cell(45, 7, ranges.get(key, ''), 0, 1, 'C')
 
-    if comment: pdf.ln(10); pdf.set_font("Arial", 'B', 10); pdf.cell(0, 6, "Comments:"); pdf.set_font("Arial", '', 10); pdf.multi_cell(0, 5, comment)
+    if comment:
+        pdf.ln(10); pdf.set_font("Arial", 'B', 10); pdf.cell(0, 6, "Comments:"); pdf.set_font("Arial", '', 10); pdf.multi_cell(0, 5, comment)
     return pdf.output(dest='S').encode('latin-1')
 
 def get_pdf_download_link(pdf_bytes, filename):
@@ -104,7 +111,7 @@ else:
     if os.path.exists("logo.png"): st.sidebar.image("logo.png", use_container_width=True)
     if st.sidebar.button("Logout"): st.session_state.logged_in = False; st.rerun()
 
-    # Admin & Billing Dashboard (UNTOUCHED)
+    # Admin Dashboard (Untouched)
     if st.session_state.role == "Admin":
         st.title("👨‍💼 Admin Dashboard")
         t1, t2, t3, t4, t5 = st.tabs(["Users", "Doctors", "Tests", "✅ Approvals", "🛠 Edit Bill"])
@@ -138,6 +145,7 @@ else:
                     en = st.text_input("Edit Name", value=target['patient'])
                     if st.button("Update Bill"): target.update({"patient": en}); st.success("Updated!"); st.rerun()
 
+    # Billing Dashboard (Untouched)
     elif st.session_state.role == "Billing":
         st.title("💳 Billing Dashboard")
         t_new, t_saved = st.tabs(["📝 New Bill", "📂 Saved Bills"])
@@ -156,9 +164,10 @@ else:
                 st.markdown(get_pdf_download_link(create_bill_pdf(new_b), f"Bill_{bid}.pdf"), unsafe_allow_html=True)
                 st.success("Saved!")
         with t_saved:
-            for b in reversed(st.session_state.saved_bills): st.write(f"{b['bill_id']} - {b['patient']}"); st.download_button("PDF", create_bill_pdf(b), file_name=f"Bill_{b['bill_id']}.pdf", key=f"b_{b['bill_id']}")
+            for b in reversed(st.session_state.saved_bills): 
+                st.write(f"{b['bill_id']} - {b['patient']}"); st.download_button("PDF", create_bill_pdf(b), file_name=f"Bill_{b['bill_id']}.pdf", key=f"b_{b['bill_id']}")
 
-    # --- TECHNICIAN DASHBOARD (FIXED) ---
+    # Technician Dashboard (Modified)
     elif st.session_state.role == "Technician":
         st.title("🔬 Technician Dashboard")
         pending = [b for b in st.session_state.saved_bills if b['bill_id'] not in st.session_state.report_data]
@@ -170,111 +179,70 @@ else:
 
         if st.session_state.active_rid:
             bill = next(x for x in pending if x['bill_id'] == st.session_state.active_rid)
-            # Detect Range Type
             fmt = "Baby" if bill['age_y'] < 5 else ("Male" if "Mr." in bill['patient'] or "Baby" in bill['patient'] else "Female")
             ranges = FBC_RANGES[fmt]
             
             st.divider()
-            st.subheader(f"📝 FBC Result Entry - {bill['patient']} ({fmt})")
+            st.subheader(f"📝 Result Entry - {bill['patient']} ({fmt})")
             
             with st.form("fbc_full_form"):
-                # Table Headers
                 h1, h2, h3, h4, h5 = st.columns([3, 2, 2, 2, 3])
                 h1.write("**PARAMETER**"); h2.write("**RESULT**"); h3.write("**ABS. COUNT**"); h4.write("**UNIT**"); h5.write("**REF. RANGE**")
                 
-                # WBC
-                r1_1, r1_2, r1_3, r1_4, r1_5 = st.columns([3, 2, 2, 2, 3])
-                r1_1.write("WBC")
-                wbc = r1_2.number_input("WBC", label_visibility="collapsed", step=1)
-                r1_4.write("cells/cu.mm"); r1_5.write(ranges['WBC'])
+                # WBC & Diff Counts (Formatting logic handled during save/pdf)
+                def get_row(label, key, unit, step_val, is_abs=False):
+                    cols = st.columns([3, 2, 2, 2, 3])
+                    cols[0].write(label)
+                    val = cols[1].number_input(key, label_visibility="collapsed", step=step_val)
+                    abs_val = ""
+                    if is_abs:
+                        # Calculation logic
+                        wbc_val = st.session_state.get('wbc_temp', 0) if key != "WBC" else val
+                        calc_abs = round((wbc_val * val) / 100) if wbc_val and val else 0
+                        abs_val = str(calc_abs)
+                        cols[2].write(abs_val)
+                    cols[3].write(unit)
+                    cols[4].write(ranges.get(key, ''))
+                    return val, abs_val
 
-                # Neutrophils
-                r2_1, r2_2, r2_3, r2_4, r2_5 = st.columns([3, 2, 2, 2, 3])
-                r2_1.write("Neutrophils")
-                neu = r2_2.number_input("NEU", label_visibility="collapsed", step=0.1)
-                abs_neu = round((wbc * neu) / 100) if wbc and neu else 0
-                r2_3.write(str(abs_neu)); r2_4.write("%"); r2_5.write(ranges['NEU'])
-
-                # Lymphocytes
-                r3_1, r3_2, r3_3, r3_4, r3_5 = st.columns([3, 2, 2, 2, 3])
-                r3_1.write("Lymphocytes")
-                lym = r3_2.number_input("LYM", label_visibility="collapsed", step=0.1)
-                abs_lym = round((wbc * lym) / 100) if wbc and lym else 0
-                r3_3.write(str(abs_lym)); r3_4.write("%"); r3_5.write(ranges['LYM'])
-
-                # Monocytes
-                r4_1, r4_2, r4_3, r4_4, r4_5 = st.columns([3, 2, 2, 2, 3])
-                r4_1.write("Monocytes")
-                mon = r4_2.number_input("MON", label_visibility="collapsed", step=0.1)
-                abs_mon = round((wbc * mon) / 100) if wbc and mon else 0
-                r4_3.write(str(abs_mon)); r4_4.write("%"); r4_5.write(ranges['MON'])
-
-                # Eosinophils (Hidden from order but needed for FBC)
-                r5_1, r5_2, r5_3, r5_4, r5_5 = st.columns([3, 2, 2, 2, 3])
-                r5_1.write("Eosinophils")
-                eos = r5_2.number_input("EOS", label_visibility="collapsed", step=0.1)
-                abs_eos = round((wbc * eos) / 100) if wbc and eos else 0
-                r5_3.write(str(abs_eos)); r5_4.write("%"); r5_5.write(ranges['EOS'])
-
-                # Basophils
-                r6_1, r6_2, r6_3, r6_4, r6_5 = st.columns([3, 2, 2, 2, 3])
-                r6_1.write("Basophils")
-                bas = r6_2.number_input("BAS", label_visibility="collapsed", step=0.1)
-                abs_bas = round((wbc * bas) / 100) if wbc and bas else 0
-                r6_3.write(str(abs_bas)); r6_4.write("%"); r6_5.write(ranges['BAS'])
-
-                st.write("**Red Cells Indices**")
-                st.divider()
-
-                # RBC
-                r7_1, r7_2, r7_3, r7_4, r7_5 = st.columns([3, 2, 2, 2, 3])
-                r7_1.write("RBC")
-                rbc = r7_2.number_input("RBC", label_visibility="collapsed", step=0.01)
-                r7_4.write("mill/cu.mm"); r7_5.write(ranges['RBC'])
-
-                # Haemoglobin
-                r8_1, r8_2, r8_3, r8_4, r8_5 = st.columns([3, 2, 2, 2, 3])
-                r8_1.write("Haemoglobin")
-                hb = r8_2.number_input("HB", label_visibility="collapsed", step=0.1)
-                r8_4.write("g/dl"); r8_5.write(ranges['HB'])
-
-                # MCV
-                r9_1, r9_2, r9_3, r9_4, r9_5 = st.columns([3, 2, 2, 2, 3])
-                r9_1.write("MCV")
-                mcv = r9_2.number_input("MCV", label_visibility="collapsed", step=0.1)
-                r9_4.write("fl"); r9_5.write(ranges['MCV'])
-
-                # MCH
-                r10_1, r10_2, r10_3, r10_4, r10_5 = st.columns([3, 2, 2, 2, 3])
-                r10_1.write("MCH")
-                mch = r10_2.number_input("MCH", label_visibility="collapsed", step=0.1)
-                r10_4.write("pg"); r10_5.write(ranges['MCH'])
-
-                # MCHC
-                r11_1, r11_2, r11_3, r11_4, r11_5 = st.columns([3, 2, 2, 2, 3])
-                r11_1.write("MCHC")
-                mchc = r11_2.number_input("MCHC", label_visibility="collapsed", step=0.1)
-                r11_4.write("g/dl"); r11_5.write(ranges['MCHC'])
-
-                # RDW
-                r12_1, r12_2, r12_3, r12_4, r12_5 = st.columns([3, 2, 2, 2, 3])
-                r12_1.write("RDW")
-                rdw = r12_2.number_input("RDW", label_visibility="collapsed", step=0.1)
-                r12_4.write("%"); r12_5.write(ranges['RDW'])
-
-                # PLATELETS
-                r13_1, r13_2, r13_3, r13_4, r13_5 = st.columns([3, 2, 2, 2, 3])
-                r13_1.write("PLATELETS")
-                plt = r13_2.number_input("PLT", label_visibility="collapsed", step=1000)
-                r13_4.write("/cu.mm"); r13_5.write(ranges['PLT'])
-
+                # Data Entry Rows
+                wbc, _ = get_row("WBC", "WBC", "cells/cu.mm", 1)
+                st.session_state.wbc_temp = wbc # Helper for live abs calc
+                neu, a_neu = get_row("Neutrophils", "NEU", "%", 0.1, True)
+                lym, a_lym = get_row("Lymphocytes", "LYM", "%", 0.1, True)
+                mon, a_mon = get_row("Monocytes", "MON", "%", 0.1, True)
+                eos, a_eos = get_row("Eosinophils", "EOS", "%", 0.1, True)
+                bas, a_bas = get_row("Basophils", "BAS", "%", 0.1, True)
+                st.write("**Red Cells Indices**"); st.divider()
+                rbc, _ = get_row("RBC", "RBC", "mill/cu.mm", 0.01)
+                hb, _ = get_row("Haemoglobin", "HB", "g/dl", 0.1)
+                mcv, _ = get_row("MCV", "MCV", "fl", 0.1)
+                mch, _ = get_row("MCH", "MCH", "pg", 0.1)
+                mchc, _ = get_row("MCHC", "MCHC", "g/dl", 0.1)
+                rdw, _ = get_row("RDW", "RDW", "%", 0.1)
+                plt, _ = get_row("PLATELETS", "PLT", "/cu.mm", 1000)
+                
                 comment = st.text_area("Comments")
-
-                if st.form_submit_button("Authorize Report"):
+                if st.form_submit_button("Authorize & View Report"):
                     res = {"WBC": wbc, "NEU": neu, "LYM": lym, "MON": mon, "EOS": eos, "BAS": bas, "RBC": rbc, "HB": hb, "MCV": mcv, "MCH": mch, "MCHC": mchc, "RDW": rdw, "PLT": plt}
-                    abs_dict = {"NEU": abs_neu, "LYM": abs_lym, "MON": abs_mon, "EOS": abs_eos, "BAS": abs_bas}
+                    abs_dict = {"NEU": a_neu, "LYM": a_lym, "MON": a_mon, "EOS": a_eos, "BAS": a_bas}
                     st.session_state.report_data[bill['bill_id']] = {"res": res, "abs": abs_dict, "fmt": fmt, "comment": comment}
+                    st.session_state.last_authorized = bill['bill_id']
                     st.session_state.active_rid = None; st.rerun()
+
+        # View Full Report after Authorization
+        if 'last_authorized' in st.session_state:
+            rid = st.session_state.last_authorized
+            b_orig = next((x for x in st.session_state.saved_bills if x['bill_id'] == rid), None)
+            if b_orig:
+                data = st.session_state.report_data[rid]
+                st.divider(); st.success(f"Report Authorized for {b_orig['patient']}!")
+                # Download Button
+                pdf_bytes = create_report_pdf(b_orig, data['res'], data['abs'], data['fmt'], data['comment'])
+                st.download_button("⬇️ Download Full Report (PDF)", pdf_bytes, file_name=f"Report_{rid}.pdf", type="primary")
+                # Visual Preview
+                st.subheader("Preview:")
+                st.json(data['res'])
 
     elif st.session_state.role == "Satellite":
         st.title("📡 Satellite Dashboard")
