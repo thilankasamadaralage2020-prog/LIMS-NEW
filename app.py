@@ -4,7 +4,7 @@ from datetime import datetime, date
 from fpdf import FPDF
 import base64
 
-# 1. Page Configuration - මෙය මුලින්ම තිබිය යුතුය
+# 1. Page Configuration
 st.set_page_config(page_title="Life Care LIMS", page_icon="🔬", layout="wide")
 
 # Custom CSS to fix input box alignment
@@ -32,9 +32,9 @@ if 'users' not in st.session_state:
 
 # --- Reference Ranges ---
 FBC_RANGES = {
-    "Baby": {"WBC": "5,000 – 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.0 - 5.2", "HB": "11.5 - 15.5", "MCV": "77.0 - 95.0", "MCH": "25.0 - 33.0", "MCHC": "31.0 - 37.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 450,000"},
-    "Male": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.5 - 5.6", "HB": "13.0 - 17.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"},
-    "Female": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "3.9 - 4.5", "HB": "11.5 - 15.5", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"}
+    "Baby": {"WBC": "5,000 – 13,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.0 - 5.2", "HB": "11.5 - 15.5", "HCT": "35.0 - 45.0", "MCV": "77.0 - 95.0", "MCH": "25.0 - 33.0", "MCHC": "31.0 - 37.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 450,000"},
+    "Male": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "4.5 - 5.6", "HB": "13.0 - 17.0", "HCT": "40.0 - 50.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"},
+    "Female": {"WBC": "4,000 – 11,000", "NEU": "45 - 75", "LYM": "25 - 45", "MON": "01 - 10", "EOS": "01 - 06", "BAS": "00 - 01", "RBC": "3.9 - 4.5", "HB": "11.5 - 15.5", "HCT": "35.0 - 45.0", "MCV": "82.0 - 98.0", "MCH": "27.0 - 32.0", "MCHC": "32.0 - 36.0", "RDW": "11.5 - 14.5", "PLT": "150,000 - 400,000"}
 }
 
 # --- PDF Functions ---
@@ -117,12 +117,55 @@ else:
 
     if st.session_state.role == "Admin":
         st.title("👨‍💼 Admin Dashboard")
-        # Existing admin code (unchanged)
         t1, t2, t3, t4 = st.tabs(["Users", "Doctors", "Tests", "✅ Approvals"])
         with t1:
-            nu, np = st.text_input("New User"), st.text_input("New Pass", type="password")
-            nr = st.selectbox("Role", ["Admin", "Billing", "Technician", "Satellite"])
-            if st.button("Create"): st.session_state.users.append({"username": nu, "password": np, "role": nr}); st.success("Created!")
+            st.subheader("Create New User")
+            nu = st.text_input("Username", key="new_u")
+            np = st.text_input("Password", type="password", key="new_p")
+            nr = st.selectbox("Role", ["Admin", "Billing", "Technician", "Satellite"], key="new_r")
+            if st.button("Create User"):
+                if nu and np:
+                    st.session_state.users.append({"username": nu, "password": np, "role": nr})
+                    st.success(f"User {nu} created!")
+                    st.rerun()
+            st.divider()
+            st.subheader("Existing Users")
+            for user in st.session_state.users:
+                st.write(f"👤 **{user['username']}** | 🔑 {user['role']}")
+
+        with t2:
+            st.subheader("Manage Doctors")
+            nd = st.text_input("Add Doctor Name")
+            if st.button("Save Doctor"): 
+                if nd:
+                    st.session_state.doctors.append(nd)
+                    st.success(f"Doctor {nd} added!")
+                    st.rerun()
+            st.divider()
+            st.subheader("Doctor List")
+            for doc in st.session_state.doctors:
+                st.write(f"👨‍⚕️ {doc}")
+
+        with t3:
+            st.subheader("Manage Tests")
+            nt = st.text_input("Add Test Name")
+            npr = st.number_input("Test Price (LKR)", min_value=0.0)
+            if st.button("Save Test"): 
+                if nt:
+                    st.session_state.tests.append({"name": nt, "price": npr})
+                    st.success(f"Test {nt} added!")
+                    st.rerun()
+            st.divider()
+            st.subheader("Available Tests")
+            for tst in st.session_state.tests:
+                st.write(f"🔬 {tst['name']} - LKR {tst['price']:,.2f}")
+
+        with t4:
+            for i, req in enumerate(st.session_state.cancel_requests):
+                st.warning(f"Request: {req['bill_id']}")
+                if st.button("Approve", key=f"ac_{i}"):
+                    st.session_state.saved_bills = [b for b in st.session_state.saved_bills if b['bill_id'] != req['bill_id']]
+                    st.session_state.cancel_requests.pop(i); st.rerun()
 
     elif st.session_state.role == "Billing":
         st.title("💳 Billing Dashboard")
@@ -143,7 +186,9 @@ else:
         st.title("🔬 Technician Dashboard")
         pending = [b for b in st.session_state.saved_bills if b['bill_id'] not in st.session_state.report_data]
         for b in pending:
-            if st.button(f"Enter Result: {b['bill_id']} - {b['patient']}"): st.session_state.active_rid = b['bill_id']; st.rerun()
+            if st.button(f"Enter Result: {b['bill_id']} - {b['patient']}"): 
+                st.session_state.active_rid = b['bill_id']
+                st.rerun()
 
         if st.session_state.active_rid:
             bill = next(x for x in pending if x['bill_id'] == st.session_state.active_rid)
@@ -152,16 +197,13 @@ else:
             
             with st.form("fbc_entry"):
                 st.subheader(f"FBC Entry: {bill['patient']} ({fmt})")
-                
                 def fbc_row(label, key, unit, step_val=1.0):
                     c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 2, 3])
                     c1.write(f"**{label}**")
                     val = c2.number_input("", key=f"in_{key}", label_visibility="collapsed", step=step_val)
-                    c3.write("") # Absolute count column (calculated on save)
-                    c4.write(unit)
-                    c5.write(ranges.get(key, ''))
+                    c3.write("") 
+                    c4.write(unit); c5.write(ranges.get(key, ''))
                     return val
-
                 wbc = fbc_row("WBC", "WBC", "cells/cu.mm")
                 neu = fbc_row("Neutrophils", "NEU", "%")
                 lym = fbc_row("Lymphocytes", "LYM", "%")
@@ -176,15 +218,9 @@ else:
                 mchc = fbc_row("MCHC", "MCHC", "g/dl", 0.1)
                 rdw = fbc_row("RDW", "RDW", "%", 0.1)
                 plt = fbc_row("PLATELETS", "PLT", "/cu.mm", 1000.0)
-                
                 comment = st.text_area("Comments")
                 if st.form_submit_button("Authorize Report"):
-                    # Calculations
-                    abs_dict = {
-                        "NEU": round((wbc * neu) / 100), "LYM": round((wbc * lym) / 100),
-                        "MON": round((wbc * mon) / 100), "EOS": round((wbc * eos) / 100),
-                        "BAS": round((wbc * bas) / 100)
-                    }
+                    abs_dict = {"NEU": round((wbc * neu) / 100), "LYM": round((wbc * lym) / 100), "MON": round((wbc * mon) / 100), "EOS": round((wbc * eos) / 100), "BAS": round((wbc * bas) / 100)}
                     res = {"WBC": wbc, "NEU": neu, "LYM": lym, "MON": mon, "EOS": eos, "BAS": bas, "RBC": rbc, "HB": hb, "MCV": mcv, "MCH": mch, "MCHC": mchc, "RDW": rdw, "PLT": plt}
                     st.session_state.report_data[bill['bill_id']] = {"res": res, "abs": abs_dict, "fmt": fmt, "comment": comment}
                     st.session_state.last_authorized = bill['bill_id']
